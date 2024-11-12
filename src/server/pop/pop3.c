@@ -28,3 +28,20 @@ void pop_init(char *dir) {
     reset_connections();
 }
 
+int initialize_pop_connection(int sock_fd, struct sockaddr_in client_address)
+{
+    Connection *client_connection = &connections[sock_fd];
+    client_connection->username[0] = '\0';
+    client_connection->authenticated = false;
+
+    const char welcome_msg[] = OK_RESPONSE(" POP3 server ready");
+    ssize_t sent_bytes = send(sock_fd, welcome_msg, strlen(welcome_msg), 0);
+    
+    if (sent_bytes < 0)
+    {
+        LOG("Error sending welcome message to client\n");
+        return -1; // Error
+    }
+    
+    return 0; // Success
+}

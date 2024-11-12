@@ -32,5 +32,6 @@ si no existe lo crea. Crea el vector con los datos de conexión de clientes.
 */
 void pop_init(char * dir_name);
 
+int initialize_pop_connection(int sock_fd, struct sockaddr_in client_address);
 
 #endif
