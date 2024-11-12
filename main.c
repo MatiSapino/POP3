@@ -36,7 +36,7 @@ sigterm_handler(const int signal) {
 }
 
 int
-main(const int argc, const char **argv) {
+main(const int, const char **argv) {
     unsigned port = 1080;
 
     if(argc == 1) {
@@ -58,7 +58,7 @@ main(const int argc, const char **argv) {
     }
 
     // no tenemos nada que leer de stdin
-    close(0);
+    close(STDIN_FILENO);
 
     const char       *err_msg = NULL;
     selector_status   ss      = SELECTOR_SUCCESS;
@@ -81,11 +81,13 @@ main(const int argc, const char **argv) {
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
 
+    //Asocia el socket con el puerto especificado.
     if(bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
         err_msg = "unable to bind socket";
         goto finally;
     }
 
+    //El socket espera conexiones entrantes, hasta 20 en la cola
     if (listen(server, 20) < 0) {
         err_msg = "unable to listen";
         goto finally;
@@ -96,10 +98,13 @@ main(const int argc, const char **argv) {
     signal(SIGTERM, sigterm_handler);
     signal(SIGINT,  sigterm_handler);
 
+    //Pone el socket en modo no bloqueante
     if(selector_fd_set_nio(server) == -1) {
         err_msg = "getting server socket flags";
         goto finally;
     }
+
+    //Creo el selector
     const struct selector_init conf = {
         .signal = SIGALRM,
         .select_timeout = {
@@ -117,6 +122,9 @@ main(const int argc, const char **argv) {
         err_msg = "unable to create selector";
         goto finally;
     }
+
+    //Se registra el socket que se creo en el selector. Se ejecuta
+    //socksv5_passive_accept cuando el socket tenga una conexion para aceptar
     const struct fd_handler socksv5 = {
         .handle_read       = socksv5_passive_accept,
         .handle_write      = NULL,
@@ -128,6 +136,9 @@ main(const int argc, const char **argv) {
         err_msg = "registering fd";
         goto finally;
     }
+
+    //Se corre esto siempre esperando conexiones al socket que creamos antes
+    //selector_select() espera conexiones
     for(;!done;) {
         err_msg = NULL;
         ss = selector_select(selector);
