@@ -1,13 +1,40 @@
-include ./Makefile.inc
+# Compiler and flags
+CC = gcc
+CFLAGS = -Wall -fdiagnostics-color=always -Iinclude
 
-all: server client
+# Debug and optimization settings
+ifneq ($(DEBUG), 0)
+CFLAGS += -g -DDEVELOPMENT
+else
+CFLAGS += -O2
+endif
 
-main:
-	$(CC) -o main main.c
+# Source files
+SRC = $(wildcard utils/*.c) main.c args.c
+OBJ = $(SRC:.c=.o)
 
-server:
+# Target executable
+EXEC = ../../dist/server
 
-client:
+# Default target
+all: log $(EXEC)
 
+log:
+	@echo
+	@echo "\033[0;36mMAKEFILE SERVER\033[0m"
+	@echo "\tSOURCES=$(SRC)"
+	@echo
+
+# Build the executable
+$(EXEC): $(OBJ)
+	$(CC) $(CFLAGS) -o $@ $(OBJ) -lm
+
+# Rule to compile .c files into .o files
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Clean up object files and executable
 clean:
-	rm -rf src/*.o
+	rm -f $(OBJ) $(EXEC)
+
+.PHONY: all clean

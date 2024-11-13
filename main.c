@@ -23,9 +23,9 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 
-#include "socks5.h"
-#include "selector.h"
-#include "socks5nio.h"
+// #include "socks5.h"
+#include "src/server/include/selector.h"
+#include "src/server/include/socks5nio.h"
 
 static bool done = false;
 
@@ -36,7 +36,7 @@ sigterm_handler(const int signal) {
 }
 
 int
-main(const int, const char **argv) {
+main(const int argc, const char **argv) {
     unsigned port = 1080;
 
     if(argc == 1) {
