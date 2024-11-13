@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include "user.h"
 
 #define MAX_POP3_ARG_LENGTH 40
 #define MAX_USERNAME_LENGTH MAX_POP3_ARG_LENGTH
@@ -22,7 +22,7 @@
 #define ENTER "\r\n"
 
 typedef struct Mailfile {
-    char uid[71];
+    char mailid[71];
     bool deleted;
     size_t size;
 } Mailfile;
@@ -33,6 +33,14 @@ typedef struct Connection {
     bool authenticated;
     Mailfile mails[MAX_CLIENT_MAILS];
 } Connection;
+
+enum pop3_state {
+    POP3_WRITE,
+    POP3_READ,
+    POP3_CLOSE,
+    POP3_ERROR,
+};
+
 /*
 Inicializa el servidor, configura el directorio donde están los archivos de correo, 
 si no existe lo crea. Crea el vector con los datos de conexión de clientes. 

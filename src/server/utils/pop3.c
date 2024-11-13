@@ -1,9 +1,30 @@
 #include "pop3.h"
 
+struct command_function {
+    char *name;
+    enum pop3_state (*function)(struct selector_key *key, struct command *command);
+};
+
+static enum pop3_state handle_user(struct selector_key *key, struct command *command);
+static enum pop3_state handle_pass(struct selector_key *key, struct command *command);
+static enum pop3_state handle_quit(struct selector_key *key, struct command *command);
+static enum pop3_state handle_capa(struct selector_key *key, struct command *command);
+
+
+static struct command_function nonauthCommands[] = {
+        {"USER",    handle_user},
+        {"PASS",    handle_pass},
+        {"QUIT",    handle_quit},
+        {"CAPA",    handle_capa},
+        {NULL,      NULL},
+};
+
+
 static const char* maildir;
 static Connection connections[MAX_CLIENTS] = {0}; 
 #define OK_RESPONSE(m) OK_RESP " " m ENTER
 #define ERR_RESPONSE(m) ERR_RESP " " m ENTER
+
 
 // Función para generar una respuesta OK
 const char* ok_respon(const char *message) {
@@ -19,7 +40,26 @@ const char* err_respon(const char *message) {
     return response;
 }
 
+enum pop3_state execute_command(struct selector_key *key, char *command) {
+    struct Connection *client = key->data;
+    struct command_function *commandFunction;
+    int i;
 
+    //commandFunction = data->authenticated ? authCommands : nonauthCommands;
+    commandFunction = nonauthCommands;
+
+    for (i = 0; commandFunction[i].name != NULL; i++) {
+        if (strcasecmp(commandFunction[i].name, command->data) == 0) {
+            return commandFunction[i].function(key, command);
+        }
+    }
+
+    errResponse(key->data, "Command not recognized");
+
+    command_parser_reset(data->commandParser);
+
+    return POP3_WRITE;
+}
 
 // Setea la ruta del directorio de mails, usando un valor por defecto si no se pasa un argumento.
 static void set_maildir(const char *dir) {
@@ -64,60 +104,30 @@ int initialize_pop_connection(int sock_fd, struct sockaddr_in client_address)
     return 0; // Success
 }
 
-
-//validacion del nombre de usuario seguro
-static bool check_username(const char *username) {
-    if (!*username || *username =='.' ){
-        return false;
-    }
-    for (const char *n = username; *n; n++) {
-        if (*n == '/' || (n - username) > MAX_USERNAME_LENGTH) {
-            return false;
-        }
-    }
-    return true;
-}
-
-//verifica la existencia del usuario en el directorio de mails
-static bool check_user(const char *username){
-    char path[strlen(maildir) + MAX_USERNAME_LENGTH + 1];
-    snprintf(path, sizeof(path), "%s/%s", maildir, username);
-    return access(path, OK_RESP) != -1;
-}
-
-//verificamos la contraseña del usuario
-static bool valid_password(const char *username, const char *pass) {
-    char path[strlen(maildir) + MAX_USERNAME_LENGTH + sizeof("/data/pass")];
-    snprintf(path, sizeof(path), "%s/%s/data/pass", maildir, username);
-    FILE *file = fopen(path, "r");
-    if (!file) {
-        return false;
-    }
-    char buffer[MAX_PASSWORD_LENGTH + 1];
-    fgets(buffer, sizeof(buffer), file);
-    fclose(file);
-    return strcmp(buffer, pass) == 0;
-}
-
 //manejo del comando USER
-static size_t handle_user(Connection *client, const char *username, char **response){
-    if (check_username(username) || !check_user(username)){
-        *response = ERR_RESPONSE(" Invalid username");
-        return strlen(*response);
+static pop3_state handle_user(Connection *client, const char *username, char **response){
+    if (!check_username(username, maildir) || !check_user(username, maildir)){
+        *response = ERR_RESPONSE("Invalid username");
+        return POP3_WRITE;
     }
+    strcpy(client->username, username);
+    *response = OK_RESPONSE("User accepted");
+    return POP3_WRITE;
 }
 
 //manejo del comando PASS
-static size_t handle_pass(Connection *client, const char *pass, char **response){
-    if (!valid_password(client->username, pass)){
+static pop3_state handle_pass(Connection *client, const char *pass, char **response){
+    if (!check_password(client->username, pass, maildir)){
         client->username[0] = '\0';
         *response = ERR_RESPONSE(" Invalid password");
-        return strlen(*response);
+        return POP3_WRITE;
     }
     client->authenticated = true;
     *response = OK_RESPONSE("Authentication successful");
-    return strlen(*response);
+    return POP3_WRITE;
 }
+////
+
 // Manejo del comando STAT
 static size_t handle_stat(Connection *client, char **response) {
     size_t size = 0, count = 0;
@@ -135,33 +145,3 @@ static size_t handle_stat(Connection *client, char **response) {
     return strlen(*response);
 }
 
-// Manejo de comandos
-size_t process_command(int client_fd, const char *command) {
-    Connection *client = &connections[client_fd];
-    char cmd[BUFFER_SIZE], arg[BUFFER_SIZE];
-    sscanf(command, "%s %s", cmd, arg);
-
-    char *response = NULL;
-    size_t response_len = 0;
-
-    if (strcasecmp(cmd, "USER") == 0) {
-        response_len = handle_user(client, arg, &response);
-    } else if (strcasecmp(cmd, "PASS") == 0) {
-        response_len = handle_pass(client, arg, &response);
-    } else if (strcasecmp(cmd, "STAT") == 0 && client->authenticated) {
-        response_len = handle_stat(client, &response);
-    } else if (strcasecmp(cmd, "QUIT") == 0) {
-        ok_respon(response, sizeof(response), "bai");
-        response_len = strlen(response);
-        send(client_fd, response, response_len, 0);
-        return CLOSE_CONNECTION;
-    } else {
-        err_respon(response, sizeof(response), "Invalid command");
-        response_len = strlen(response);
-    }
-
-    send(client_fd, response, response_len, 0);
-    if (response) free(response);
-
-    return KEEP_CONNECTION_OPEN;
-}
