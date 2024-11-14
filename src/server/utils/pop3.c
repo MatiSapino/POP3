@@ -4,11 +4,12 @@ struct command_function {
     char *name;
     enum pop3_state (*function)(struct selector_key *key, struct command *command);
 };
-
+/*
 static enum pop3_state handle_user(struct selector_key *key, struct command *command);
 static enum pop3_state handle_pass(struct selector_key *key, struct command *command);
 static enum pop3_state handle_quit(struct selector_key *key, struct command *command);
 static enum pop3_state handle_capa(struct selector_key *key, struct command *command);
+*/
 
 
 static struct command_function nonauthCommands[] = {
@@ -49,7 +50,7 @@ enum pop3_state execute_command(struct selector_key *key, char *command) {
     commandFunction = nonauthCommands;
 
     for (i = 0; commandFunction[i].name != NULL; i++) {
-        if (strcasecmp(commandFunction[i].name, command->data) == 0) {
+        if (strcasecmp(commandFunction[i].name, command) == 0) {
             return commandFunction[i].function(key, command);
         }
     }
@@ -103,7 +104,7 @@ int initialize_pop_connection(int sock_fd, struct sockaddr_in client_address)
     
     return 0; // Success
 }
-
+/*
 //manejo del comando USER
 static pop3_state handle_user(Connection *client, const char *username, char **response){
     if (!check_username(username, maildir) || !check_user(username, maildir)){
@@ -145,3 +146,4 @@ static size_t handle_stat(Connection *client, char **response) {
     return strlen(*response);
 }
 
+*/

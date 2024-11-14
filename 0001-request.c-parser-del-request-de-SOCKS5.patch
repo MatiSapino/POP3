@@ -1,0 +1,683 @@
+From bbe02a58fe3306a2ae79e7799431b94b272a0485 Mon Sep 17 00:00:00 2001
+From: "Juan F. Codagnone" <juan@leak.com.ar>
+Date: Thu, 15 Mar 2018 13:01:11 -0300
+Subject: [PATCH 1/9] request.c -- parser del request de SOCKS5
+
+Muestra como deserializar el command request y serializar su respuesta
+del protocolo SOCKSv5.
+
+El parsing es agnostico del mecanismo de lectura/escritura, y puede
+hacerse de byte en byte.
+---
+ src/request.c      | 291 +++++++++++++++++++++++++++++++++++++++++++++
+ src/request.h      | 173 +++++++++++++++++++++++++++
+ src/request_test.c | 179 ++++++++++++++++++++++++++++
+ 3 files changed, 643 insertions(+)
+ create mode 100644 src/request.c
+ create mode 100644 src/request.h
+ create mode 100644 src/request_test.c
+
+diff --git a/src/request.c b/src/request.c
+new file mode 100644
+index 0000000..402e6c6
+--- /dev/null
++++ b/src/request.c
+@@ -0,0 +1,291 @@
++/**
++ * request.c -- parser del request de SOCKS5
++ */
++#include <string.h> // memset
++#include <arpa/inet.h>
++
++#include "request.h"
++
++static void
++remaining_set(struct request_parser* p, const int n) {
++    p->i = 0;
++    p->n = n;
++}
++
++static int
++remaining_is_done(struct request_parser* p) {
++    return p->i >= p->n;
++}
++
++//////////////////////////////////////////////////////////////////////////////
++
++static enum request_state
++version(const uint8_t c, struct request_parser* p) {
++    enum request_state next;
++    switch (c) {
++        case 0x05:
++            next = request_cmd;
++            break;
++        default:
++            next = request_error_unsupported_version;
++            break;
++    }
++
++    return next;
++}
++
++static enum request_state
++cmd(const uint8_t c, struct request_parser* p) {
++    p->request->cmd = c;
++
++    return request_rsv;
++}
++
++static enum request_state
++rsv(const uint8_t c, struct request_parser* p) {
++    return request_atyp;
++}
++
++static enum request_state
++atyp(const uint8_t c, struct request_parser* p) {
++    enum request_state next;
++
++    p->request->dest_addr_type = c;
++    switch (p->request->dest_addr_type) {
++        case socks_req_addrtype_ipv4:
++            remaining_set(p, 4);
++            memset(&(p->request->dest_addr.ipv4), 0,
++                   sizeof(p->request->dest_addr.ipv4));
++            p->request->dest_addr.ipv4.sin_family = AF_INET;
++            next = request_dstaddr;
++            break;
++        case socks_req_addrtype_ipv6:
++            remaining_set(p, 16);
++            memset(&(p->request->dest_addr.ipv6), 0,
++                               sizeof(p->request->dest_addr.ipv6));
++            p->request->dest_addr.ipv6.sin6_family = AF_INET6;
++            next = request_dstaddr;
++            break;
++        case socks_req_addrtype_domain:
++            next = request_dstaddr_fqdn;
++            break;
++        default:
++            next = request_error_unsupported_atyp;
++            break;
++    }
++
++    return next;
++}
++
++static enum request_state
++dstaddr_fqdn(const uint8_t c, struct request_parser* p) {
++    remaining_set(p, c);
++    p->request->dest_addr.fqdn[p->n - 1] = 0;
++
++    return request_dstaddr;
++}
++
++static enum request_state
++dstaddr(const uint8_t c, struct request_parser* p) {
++    enum request_state next;
++
++    switch (p->request->dest_addr_type) {
++        case socks_req_addrtype_ipv4:
++            ((uint8_t *)&(p->request->dest_addr.ipv4.sin_addr))[p->i++] = c;
++            break;
++        case socks_req_addrtype_ipv6:
++            ((uint8_t *)&(p->request->dest_addr.ipv6.sin6_addr))[p->i++] = c;
++            break;
++        case socks_req_addrtype_domain:
++            p->request->dest_addr.fqdn[p->i++] = c;
++            break;
++        }
++    if (remaining_is_done(p)) {
++        remaining_set(p, 2);
++        p->request->dest_port = 0;
++        next = request_dstport;
++    } else {
++        next = request_dstaddr;
++    }
++
++    return next;
++}
++
++static enum request_state
++dstport(const uint8_t c, struct request_parser* p) {
++    enum request_state next;
++    *(((uint8_t *) &(p->request->dest_port)) + p->i) = c;
++    p->i++;
++    next = request_dstport;
++    if (p->i >= p->n) {
++        next = request_done;
++    }
++    return next;
++}
++
++extern void
++request_parser_init (struct request_parser* p) {
++    p->state = request_version;
++    memset(p->request, 0, sizeof(*(p->request)));
++}
++
++
++extern enum request_state 
++request_parser_feed (struct request_parser* p, const uint8_t c) {
++    enum request_state next;
++
++    switch(p->state) {
++        case request_version:
++            next = version(c, p);
++            break;
++        case request_cmd:
++            next = cmd(c, p);
++            break;
++        case request_rsv:
++            next = rsv(c, p);
++            break;
++        case request_atyp:
++            next = atyp(c, p);
++            break;
++        case request_dstaddr_fqdn:
++            next = dstaddr_fqdn(c, p);
++            break;
++        case  request_dstaddr:
++            next = dstaddr(c, p);
++            break;
++        case request_dstport:
++            next = dstport(c, p);
++            break;
++        case request_done:
++        case request_error:
++        case request_error_unsupported_version:
++        case request_error_unsupported_atyp:
++            next = p->state;
++            break;
++        default:
++            next = request_error;
++            break;
++    }
++
++    return p->state = next;
++}
++
++extern bool 
++request_is_done(const enum request_state st, bool *errored) {
++    if(st >= request_error && errored != 0) {
++        *errored = true;
++    }
++    return st >= request_done;
++}
++
++extern enum request_state
++request_consume(buffer *b, struct request_parser *p, bool *errored) {
++    enum request_state st = p->state;
++
++    while(buffer_can_read(b)) {
++       const uint8_t c = buffer_read(b);
++       st = request_parser_feed(p, c);
++       if(request_is_done(st, errored)) {
++          break;
++       }
++    }
++    return st;
++}
++
++extern void
++request_close(struct request_parser *p) {
++    // nada que hacer
++}
++
++extern int
++request_marshall(buffer *b,
++                 const enum socks_response_status status) {
++     size_t  n;
++    uint8_t *buff = buffer_write_ptr(b, &n);
++    if(n < 10) {
++        return -1;
++    }
++    buff[0] = 0x05;
++    buff[1] = status;
++    buff[2] = 0x00;
++    buff[3] = socks_req_addrtype_ipv4;
++    buff[4] = 0x00;
++    buff[5] = 0x00;
++    buff[6] = 0x00;
++    buff[7] = 0x00;
++    buff[8] = 0x00;
++    buff[9] = 0x00;
++
++    buffer_write_adv(b, 10);
++    return 10;
++}
++
++enum socks_response_status
++cmd_resolve(struct request* request,  struct sockaddr **originaddr,
++            socklen_t *originlen, int *domain) {
++    enum socks_response_status ret = status_general_SOCKS_server_failure;
++
++    *domain                  = AF_INET;
++    struct sockaddr *addr    = 0x00;
++    socklen_t        addrlen = 0;
++
++    switch (request->dest_addr_type) {
++        case socks_req_addrtype_domain: {
++            struct hostent *hp = gethostbyname(request->dest_addr.fqdn);
++            if (hp == 0) {
++                memset(&request->dest_addr, 0x00,
++                                       sizeof(request->dest_addr));
++                break;
++            } 
++            request->dest_addr.ipv4.sin_family = hp->h_addrtype;
++            memcpy((char *)&request->dest_addr.ipv4.sin_addr,
++                   *hp->h_addr_list, hp->h_length);
++            
++        }
++        /* no break */
++        case socks_req_addrtype_ipv4:
++            *domain  = AF_INET;
++            addr    = (struct sockaddr *)&(request->dest_addr.ipv4);
++            addrlen = sizeof(request->dest_addr.ipv4);
++            request->dest_addr.ipv4.sin_port = request->dest_port;
++            break;
++        case socks_req_addrtype_ipv6:
++            *domain  = AF_INET6;
++            addr    = (struct sockaddr *)&(request->dest_addr.ipv6);
++            addrlen = sizeof(request->dest_addr.ipv6);
++            request->dest_addr.ipv6.sin6_port = request->dest_port;
++            break;
++        default:
++            return status_address_type_not_supported;
++    }
++
++    *originaddr = addr;
++    *originlen  = addrlen;
++
++    return ret;
++}
++
++#include <errno.h>
++
++enum socks_response_status
++errno_to_socks(const int e) {
++    enum socks_response_status ret = status_general_SOCKS_server_failure;
++    switch (e) {
++        case 0:
++            ret = status_succeeded;
++            break;
++        case ECONNREFUSED:
++            ret = status_connection_refused;
++            break;
++        case EHOSTUNREACH:
++            ret = status_host_unreachable;
++            break;
++        case ENETUNREACH:
++            ret = status_network_unreachable;
++            break;
++        case ETIMEDOUT:
++            ret = status_ttl_expired;
++            break;
++    }
++    return ret;
++}
+diff --git a/src/request.h b/src/request.h
+new file mode 100644
+index 0000000..67a179f
+--- /dev/null
++++ b/src/request.h
+@@ -0,0 +1,173 @@
++#ifndef Au9MTAsFSOTIW3GaVruXIl3gVBU_REQUEST_H
++#define Au9MTAsFSOTIW3GaVruXIl3gVBU_REQUEST_H
++
++#include <stdint.h>
++#include <stdbool.h>
++
++#include <netinet/in.h>
++
++#include "buffer.h"
++
++/*   The SOCKS request is formed as follows:
++ *
++ *      +----+-----+-------+------+----------+----------+
++ *      |VER | CMD |  RSV  | ATYP | DST.ADDR | DST.PORT |
++ *      +----+-----+-------+------+----------+----------+
++ *      | 1  |  1  | X'00' |  1   | Variable |    2     |
++ *      +----+-----+-------+------+----------+----------+
++ *
++ *   Where:
++ *
++ *        o  VER    protocol version: X'05'
++ *        o  CMD
++ *           o  CONNECT X'01'
++ *           o  BIND X'02'
++ *           o  UDP ASSOCIATE X'03'
++ *        o  RSV    RESERVED
++ *        o  ATYP   address type of following address
++ *           o  IP V4 address: X'01'
++ *           o  DOMAINNAME: X'03'
++ *           o  IP V6 address: X'04'
++ *        o  DST.ADDR       desired destination address
++ *        o  DST.PORT desired destination port in network octet
++ *           order
++ */
++/*
++ * miembros de la sección 4: `Requests'
++ *  - Cmd
++ *  - AddressType
++ *  - Address: IPAddress (4 y 6), DomainNameAdddres
++ */
++
++enum socks_req_cmd {
++    socks_req_cmd_connect   = 0x01,
++    socks_req_cmd_bind      = 0x02,
++    socks_req_cmd_associate = 0x03,
++};
++
++enum socks_addr_type {
++    socks_req_addrtype_ipv4   = 0x01,
++    socks_req_addrtype_domain = 0x03,
++    socks_req_addrtype_ipv6   = 0x04,
++};
++
++union socks_addr {
++    char fqdn[0xff];
++    struct sockaddr_in  ipv4;
++    struct sockaddr_in6 ipv6;
++};
++
++struct request {
++    enum  socks_req_cmd   cmd;
++    enum  socks_addr_type dest_addr_type;
++    union socks_addr      dest_addr;
++    /** port in network byte order */
++    in_port_t             dest_port;
++};
++
++enum request_state {
++   request_version,
++   request_cmd,
++   request_rsv,
++   request_atyp,
++   request_dstaddr_fqdn,
++   request_dstaddr,
++   request_dstport,
++
++   // apartir de aca están done
++   request_done,
++
++   // y apartir de aca son considerado con error
++   request_error,
++   request_error_unsupported_version,
++   request_error_unsupported_atyp,
++
++};
++
++struct request_parser {
++   struct request *request;
++   enum request_state state;
++   /** cuantos bytes tenemos que leer*/
++   uint8_t n;
++   /** cuantos bytes ya leimos */
++   uint8_t i;
++};
++
++/*
++ * "...
++ * 6.  Replies
++ *
++ * The SOCKS request information is sent by the client as soon as it has
++ * established a connection to the SOCKS server, and completed the
++ * authentication negotiations.  The server evaluates the request, and
++ * returns a reply formed as follows:
++ * ..."-- sección 6
++ *
++ */
++enum socks_response_status {
++    status_succeeded                          = 0x00,
++    status_general_SOCKS_server_failure       = 0x01,
++    status_connection_not_allowed_by_ruleset  = 0x02,
++    status_network_unreachable                = 0x03,
++    status_host_unreachable                   = 0x04,
++    status_connection_refused                 = 0x05,
++    status_ttl_expired                        = 0x06,
++    status_command_not_supported              = 0x07,
++    status_address_type_not_supported         = 0x08,
++};
++
++
++/** inicializa el parser */
++void 
++request_parser_init (struct request_parser *p);
++
++/** entrega un byte al parser. retorna true si se llego al final  */
++enum request_state 
++request_parser_feed (struct request_parser *p, const uint8_t c);
++
++/**
++ * por cada elemento del buffer llama a `request_parser_feed' hasta que
++ * el parseo se encuentra completo o se requieren mas bytes.
++ *
++ * @param errored parametro de salida. si es diferente de NULL se deja dicho
++ *   si el parsing se debió a una condición de error
++ */
++enum request_state
++request_consume(buffer *b, struct request_parser *p, bool *errored);
++
++/**
++ * Permite distinguir a quien usa socks_hello_parser_feed si debe seguir
++ * enviando caracters o no. 
++ *
++ * En caso de haber terminado permite tambien saber si se debe a un error
++ */
++bool 
++request_is_done(const enum request_state st, bool *errored);
++
++void
++request_close(struct request_parser *p);
++
++/**
++ * serializa en buff la una respuesta al request.
++ *
++ * Retorna la cantidad de bytes ocupados del buffer o -1 si no había
++ * espacio suficiente.
++ */
++extern int
++request_marshall(buffer *b,
++                 const enum socks_response_status status);
++
++
++/** convierte a errno en socks_response_status */
++enum socks_response_status
++errno_to_socks(int e);
++
++#include <netdb.h>
++#include <arpa/inet.h>
++
++/** se encarga de la resolcuión de un request */
++enum socks_response_status
++cmd_resolve(struct request* request,  struct sockaddr **originaddr,
++            socklen_t *originlen, int *domain);
++
++#endif
+diff --git a/src/request_test.c b/src/request_test.c
+new file mode 100644
+index 0000000..3188b31
+--- /dev/null
++++ b/src/request_test.c
+@@ -0,0 +1,179 @@
++#include <stdlib.h>
++#include <string.h>
++#include <check.h>
++
++#include "request.h"
++#include "tests.h"
++
++#define FIXBUF(b, data) buffer_init(&(b), N(data), (data)); \
++                        buffer_write_adv(&(b), N(data))
++
++START_TEST (test_request_unsuppored_version) {
++    struct request request;
++    struct request_parser parser = {
++        .request = &request,
++    };
++    request_parser_init(&parser);
++    uint8_t data[] = {
++        0x04,
++    };
++    buffer b; FIXBUF(b, data);
++    bool errored = false;
++    enum request_state st = request_consume(&b, &parser, &errored);
++    
++    ck_assert_uint_eq(true, errored);
++    ck_assert_uint_eq(request_error_unsupported_version,     st);
++
++}
++END_TEST
++
++
++START_TEST (test_request_connect_domain) {
++    struct request request;
++    struct request_parser parser = {
++        .request = &request,
++    };
++    request_parser_init(&parser);
++    uint8_t data[] = {
++        0x05, 0x01, 0x00, 0x03, 0x0f, 0x77, 0x77, 0x77, 
++        0x2e, 0x69, 0x74, 0x62, 0x61, 0x2e, 0x65, 0x64, 
++        0x75, 0x2e, 0x61, 0x72, 0x00, 0x50, 
++    };
++    buffer b; FIXBUF(b, data);
++    bool errored = false;
++    request_consume(&b, &parser, &errored);
++    
++    ck_assert_uint_eq(false, errored);
++    ck_assert_uint_eq(socks_req_cmd_connect,     request.cmd);
++    ck_assert_uint_eq(socks_req_addrtype_domain, request.dest_addr_type);
++    ck_assert_str_eq ("www.itba.edu.ar",         request.dest_addr.fqdn);
++    ck_assert_uint_eq(htons(80),                 request.dest_port);
++
++}
++END_TEST
++
++
++START_TEST (test_request_connect_ipv4) {
++    struct request request;
++    struct request_parser parser = {
++        .request = &request,
++    };
++    request_parser_init(&parser);
++
++    uint8_t data[] = {
++        0x05, 0x01, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x01,
++        0x23, 0x82
++    };
++    buffer b; FIXBUF(b, data);
++    bool errored = false;
++    enum request_state st = request_consume(&b, &parser, &errored);
++    
++    ck_assert_uint_eq(false, errored);
++    ck_assert_uint_eq(request_done,              st);
++    ck_assert_uint_eq(socks_req_cmd_connect,     request.cmd);
++    ck_assert_uint_eq(socks_req_addrtype_ipv4,   request.dest_addr_type);
++    ck_assert_uint_eq(htons(9090),               request.dest_port);
++
++}
++END_TEST
++
++START_TEST (test_request_connect_ipv6) {
++    struct request request;
++    struct request_parser parser = {
++        .request = &request,
++    };
++    request_parser_init(&parser);
++
++    uint8_t data[] = {
++        0x05, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00,
++        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
++        0x00, 0x00, 0x00, 0x01, 0x23, 0x82 
++    };
++    buffer b; FIXBUF(b, data);
++    bool errored = false;
++    enum request_state st = request_consume(&b, &parser, &errored);
++    
++    ck_assert_uint_eq(false, errored);
++    ck_assert_uint_eq(request_done,              st);
++    ck_assert_uint_eq(socks_req_cmd_connect,     request.cmd);
++    ck_assert_uint_eq(socks_req_addrtype_ipv6,   request.dest_addr_type);
++    ck_assert_uint_eq(htons(9090),               request.dest_port);
++
++}
++END_TEST
++
++START_TEST (test_request_connect_multiple_messages) {
++    struct request request;
++    struct request_parser parser = {
++        .request = &request,
++    };
++    request_parser_init(&parser);
++    uint8_t data[] = {
++        // 00
++        0x05, 0x01, 0x00, 0x03, 0x0f, 0x77, 0x77, 0x77,
++        0x2e, 0x69, 0x74, 0x62, 0x61, 0x2e, 0x65, 0x64,
++        0x75, 0x2e, 0x61, 0x72, 0x00, 0x50,
++        // 01
++        0x05, 0x01, 0x00, 0x03, 0x0f, 0x77, 0x77, 0x77,
++        0x2e, 0x69, 0x74, 0x62, 0x61, 0x2e, 0x65, 0x64,
++        0x75, 0x2e, 0x61, 0x72, 0x00, 0x50,
++    };
++    buffer b; FIXBUF(b, data);
++    bool errored = false;
++    request_consume(&b, &parser, &errored);
++
++    ck_assert_uint_eq(false, errored);
++    ck_assert_uint_eq(socks_req_cmd_connect,     request.cmd);
++    ck_assert_uint_eq(socks_req_addrtype_domain, request.dest_addr_type);
++    ck_assert_str_eq ("www.itba.edu.ar",         request.dest_addr.fqdn);
++    ck_assert_uint_eq(htons(80),                 request.dest_port);
++
++    errored = false;
++    memset(&request, 0, sizeof(request));
++    request_parser_init(&parser);
++
++    request_consume(&b, &parser, &errored);
++    ck_assert_uint_eq(false, errored);
++    ck_assert_uint_eq(socks_req_cmd_connect,     request.cmd);
++    ck_assert_uint_eq(socks_req_addrtype_domain, request.dest_addr_type);
++    ck_assert_str_eq ("www.itba.edu.ar",         request.dest_addr.fqdn);
++    ck_assert_uint_eq(htons(80),                 request.dest_port);
++}
++END_TEST
++
++Suite * 
++request_suite(void) {
++    Suite *s;
++    TCase *tc;
++
++    s = suite_create("socks");
++
++    /* Core test case */
++    tc = tcase_create("request");
++
++    tcase_add_test(tc, test_request_unsuppored_version);
++    tcase_add_test(tc, test_request_connect_domain);
++    tcase_add_test(tc, test_request_connect_ipv4);
++    tcase_add_test(tc, test_request_connect_ipv6);
++    tcase_add_test(tc, test_request_connect_multiple_messages);
++
++    suite_add_tcase(s, tc);
++
++    return s;
++}
++
++int 
++main(void) {
++    int number_failed;
++    Suite *s;
++    SRunner *sr;
++
++    s = request_suite();
++    sr = srunner_create(s);
++
++    srunner_run_all(sr, CK_NORMAL);
++    number_failed = srunner_ntests_failed(sr);
++    srunner_free(sr);
++    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
++}
++
+-- 
+2.45.2
+

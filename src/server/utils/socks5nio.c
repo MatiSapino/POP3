@@ -12,7 +12,7 @@
 
 #include <arpa/inet.h>
 
-// #include "hello.h"
+#include "hello.h"
 #include "request.h"
 #include "buffer.h"
 
@@ -51,7 +51,6 @@ enum socks_v5state {
      */
     HELLO_WRITE,
 
-…
 
     // estados terminales
     DONE,
@@ -70,10 +69,9 @@ struct hello_st {
     uint8_t               method;
 } ;
 
-…
 
 /*
- * Si bien cada estado tiene su propio struct que le da un alcance
+ * Si bien cada estado tiene su propio  struct que le da un alcance
  * acotado, disponemos de la siguiente estructura para hacer una única
  * alocación cuando recibimos la conexión.
  *
@@ -81,7 +79,7 @@ struct hello_st {
  * liberarlo finalmente, y un pool para reusar alocaciones previas.
  */
 struct socks5 {
-…
+
     /** maquinas de estados */
     struct state_machine          stm;
 
@@ -96,7 +94,7 @@ struct socks5 {
         struct connecting         conn;
         struct copy               copy;
     } orig;
-…
+
 };
 
 
@@ -275,10 +273,10 @@ static const struct state_definition client_statbl[] = {
     {
         .state            = HELLO_READ,
         .on_arrival       = hello_read_init,
-        .on_departure     = hello_read_close,
+        .on_departure     = hello_parser_close,
         .on_read_ready    = hello_read,
     },
-…
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 // Handlers top level de la conexión pasiva.
