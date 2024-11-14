@@ -1,40 +1,37 @@
-# Compiler and flags
-CC = gcc
-CFLAGS = -Wall -fdiagnostics-color=always -Iinclude
+include ./Makefile.inc
 
-# Debug and optimization settings
-ifneq ($(DEBUG), 0)
-CFLAGS += -g -DDEVELOPMENT
-else
-CFLAGS += -O2
-endif
+SERVER_SOURCES = $(wildcard src/server/utils/*.c)
+MAIN_SOURCES = $(wildcard *.c)
 
-# Source files
-SRC = $(wildcard utils/*.c) main.c args.c
-OBJ = $(SRC:.c=.o)
+OUTPUT_FOLDER = ./bin
+OBJECTS_FOLDER = ./obj
 
-# Target executable
-EXEC = ../../dist/server
+SERVER_OBJECTS = $(SERVER_SOURCES:src/server/utils/%.c=obj%.o)
+MAIN_OBJECTS = $(MAIN_SOURCES:%.c=obj%.o)
 
-# Default target
-all: log $(EXEC)
+SERVER_OUTPUT_FILE = $(OUTPUT_FOLDER)/output_server
+MAIN_OUTPUT_FILE = $(OUTPUT_FOLDER)/main
 
-log:
-	@echo
-	@echo "\033[0;36mMAKEFILE SERVER\033[0m"
-	@echo "\tSOURCES=$(SRC)"
-	@echo
+all: server main
 
-# Build the executable
-$(EXEC): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $(OBJ) -lm
+server: $(SERVER_OUTPUT_FILE)
+main: $(MAIN_OUTPUT_FILE)
 
-# Rule to compile .c files into .o files
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@
+$(SERVER_OUTPUT_FILE): $(SERVER_OBJECTS)
+	mkdir -p $(OUTPUT_FOLDER)
+	$(COMPILER) &(CFLAGS) $(SERVER_OBJECTS) -o $(SERVER_OUTPUT_FILE)
 
-# Clean up object files and executable
+$(MAIN_OUTPUT_FILE): $(MAIN_OBJECTS)
+	mkdir -p $(OUTPUT_FOLDER)
+	$(COMPILER) $(CFLAGS) $(MAIN_OBJECTS) -o $(MAIN_OUTPUT_FILE)
+
+obj%.o: src/server/utils/%.c
+	mkdir -p $(OBJECTS_FOLDER)/output_server
+	mkdir -p $(OBJECTS_FOLDER)/main
+	$(COMPILER) $(CFLAGS) -c $< -o $@
+
 clean:
-	rm -f $(OBJ) $(EXEC)
+	rm -rf $(OUTPUT_FOLDER)
+	rm -rf $(OBJECTS_FOLDER)
 
-.PHONY: all clean
+.PHONY: all server main clean

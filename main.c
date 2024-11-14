@@ -186,8 +186,10 @@
 #include <asm-generic/errno-base.h>
 #include <unistd.h>
 #include <sys/socket.h>
-
+#include "src/server/include/selector.h"
+#include "src/server/include/user.h"
 #include <netinet/in.h>
+
 
 static bool done = false;
 
@@ -196,8 +198,22 @@ static void sigterm_handler(const int signal) {
     done = true;
 }
 
-int main(const int argc, const char **argv)
-{
+
+void read_socket(int socket, char *buf, size_t size ) {
+
+    struct selector_key * selector_key = {NULL, socket, buf};
+
+    Client * client = create_user(socket, buf);
+
+    while (1) {
+        read(socket, buf, size);
+        stm_parse(buf, selector_key, client);
+        fprintf(stderr, "%s", buf);
+        send(socket, buf, strlen(buf), 0);
+    }
+}
+
+int main(const int argc, const char **argv) {
     unsigned port = 1080;
 
     if (argc == 1) {
@@ -221,6 +237,7 @@ int main(const int argc, const char **argv)
     // nothing to read in stdin
     close(STDIN_FILENO);
 
+    pop_init(NULL);
     const char *err_msg = NULL;
 
     struct sockaddr_in addr;
@@ -262,12 +279,14 @@ int main(const int argc, const char **argv)
     for(;!done;) {
         socklen_t addr_len = sizeof(addr);
         int new_socket = accept(server, (struct sockaddr*) &addr, &addr_len);
+        char buf[100];
+        read_socket(new_socket, &buf, sizeof(addr));
 
         if (new_socket >= 0) {
             fprintf(stdout, "Connection established\n");
         }
         if (new_socket < 0) {
-            err_msg = "unable to accept";
+            err_msg = "Unable to accept";
             goto finally;
         }
         err_msg = NULL;

@@ -7,8 +7,7 @@
 
 #include "args.h"
 
-static unsigned short
-port(const char *s) {
+static unsigned short port(const char *s) {
      char *end     = 0;
      const long sl = strtol(s, &end, 10);
 
@@ -22,8 +21,7 @@ port(const char *s) {
      return (unsigned short)sl;
 }
 
-static void
-user(char *s, struct users *user) {
+static void user(char *s, struct users *user) {
     char *p = strchr(s, ':');
     if(p == NULL) {
         fprintf(stderr, "password not found\n");
@@ -37,8 +35,7 @@ user(char *s, struct users *user) {
 
 }
 
-static void
-version(void) {
+static void version(void) {
     fprintf(stderr, "socks5v version 0.0\n"
                     "ITBA Protocolos de Comunicación 2020/1 -- Grupo X\n"
                     "AQUI VA LA LICENCIA\n");
@@ -51,13 +48,12 @@ version(void) {
 └── user1
     ├── cur
     ├── new
-    │   └── mail1
+    │     └── mail1
     └── tmp
 
 */
 
-static void
-usage(const char *progname) {
+static void usage(const char *progname) {
     fprintf(stderr,
         "Usage: %s [OPTION]...\n"
         "\n"
@@ -74,8 +70,7 @@ usage(const char *progname) {
     exit(1);
 }
 
-void 
-parse_args(const int argc, char **argv, struct socks5args *args) {
+void parse_args(const int argc, char **argv, struct socks5args *args) {
     memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
 
     args->socks_addr = "0.0.0.0";
