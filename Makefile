@@ -1,37 +1,31 @@
-include ./Makefile.inc
+# Makefile principal
 
-SERVER_SOURCES = $(wildcard src/server/utils/*.c)
-MAIN_SOURCES = $(wildcard *.c)
+include Makefile.inc
 
-OUTPUT_FOLDER = ./bin
-OBJECTS_FOLDER = ./obj
+SRC_DIR = src/server
+BUILD_DIR = build
+OBJ_DIR = $(BUILD_DIR)/objects
+BIN_DIR = $(BUILD_DIR)/bin
+INCLUDE_DIR = $(SRC_DIR)/include
 
-SERVER_OBJECTS = $(SERVER_SOURCES:src/server/utils/%.c=obj%.o)
-MAIN_OBJECTS = $(MAIN_SOURCES:%.c=obj%.o)
+SRCS = $(wildcard $(SRC_DIR)/utils/*.c) args.c main.c
+OBJS = $(SRCS:%.c=$(OBJ_DIR)/%.o)
 
-SERVER_OUTPUT_FILE = $(OUTPUT_FOLDER)/output_server
-MAIN_OUTPUT_FILE = $(OUTPUT_FOLDER)/main
+EXECUTABLE = $(BIN_DIR)/my_program
 
-all: server main
+CFLAGS += -I$(INCLUDE_DIR)
 
-server: $(SERVER_OUTPUT_FILE)
-main: $(MAIN_OUTPUT_FILE)
+all: $(EXECUTABLE)
 
-$(SERVER_OUTPUT_FILE): $(SERVER_OBJECTS)
-	mkdir -p $(OUTPUT_FOLDER)
-	$(COMPILER) &(CFLAGS) $(SERVER_OBJECTS) -o $(SERVER_OUTPUT_FILE)
+$(EXECUTABLE): $(OBJS)
+	@mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) -o $@ $(OBJS)
 
-$(MAIN_OUTPUT_FILE): $(MAIN_OBJECTS)
-	mkdir -p $(OUTPUT_FOLDER)
-	$(COMPILER) $(CFLAGS) $(MAIN_OBJECTS) -o $(MAIN_OUTPUT_FILE)
-
-obj%.o: src/server/utils/%.c
-	mkdir -p $(OBJECTS_FOLDER)/output_server
-	mkdir -p $(OBJECTS_FOLDER)/main
-	$(COMPILER) $(CFLAGS) -c $< -o $@
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OUTPUT_FOLDER)
-	rm -rf $(OBJECTS_FOLDER)
+	rm -rf $(BUILD_DIR)
 
-.PHONY: all server main clean
+.PHONY: all clean test

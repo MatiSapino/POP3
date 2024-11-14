@@ -7,7 +7,7 @@
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
-
+struct selector_key *key;
 
 void stm_init(struct state_machine *stm) {
     // verificamos que los estados son correlativos, y que están bien asignados.
@@ -97,6 +97,13 @@ unsigned stm_state(struct state_machine *stm) {
 }
 
 void stm_parse(char * buffer, struct selector_key *key,Client * client){
+
+    if (buffer == NULL) {
+        fprintf(stderr, "Received NULL data in stm_parse\n");
+        return;
+    }
+
+
     if (strcmp(buffer, "USER") == 0) {
         jump(client->stm, STATE_WAIT_USERNAME, key);
     }

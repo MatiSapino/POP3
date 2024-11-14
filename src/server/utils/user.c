@@ -2,7 +2,6 @@
 
 #include "user.h"
 
-static struct user users[100];
 static size_t users_count = 0;
 
 
@@ -17,7 +16,7 @@ struct Client * create_user(int socket, char *buf){
 }
 
 //validacion del nombre de usuario seguro
-static bool user_authenticate(const char *username) {
+bool user_authenticate(const char *username) {
     if (!*username || *username =='.' ){
         return false;
     }
@@ -33,7 +32,7 @@ static bool user_authenticate(const char *username) {
 bool check_user(const char *username, const char *maildir) {
     char path[strlen(maildir) + MAX_USERNAME_LENGTH + 1];
     snprintf(path, sizeof(path), "%s/%s", maildir, username); //imprime el path del user 
-    return access(path, OK_RESP) != -1; //chequeo si ese archivo existe, si existe --> existe el user
+    return access(path, R_OK) != -1; //chequeo si ese archivo existe, si existe --> existe el user
 }
 
 //chequeo de la contraseña

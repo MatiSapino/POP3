@@ -201,13 +201,26 @@ static void sigterm_handler(const int signal) {
 
 void read_socket(int socket, char *buf, size_t size ) {
 
-    struct selector_key * selector_key = {NULL, socket, buf};
+    struct selector_key selector_key = {NULL, socket, buf};
 
-    Client * client = create_user(socket, buf);
+    struct Client * client = create_user(socket, buf);
+
+    if (client == NULL) {
+        perror("Failed to create client");
+        return;
+    }
 
     while (1) {
-        read(socket, buf, size);
-        stm_parse(buf, selector_key, client);
+        ssize_t bytes_read = read(socket, buf, size);
+        if (bytes_read <= 0) {
+            if (bytes_read == 0) {
+                fprintf(stderr, "Connection closed by client\n");
+            } else {
+                perror("Error reading from socket");
+            }
+            return;
+        }
+        stm_parse(buf, &selector_key, client);
         fprintf(stderr, "%s", buf);
         send(socket, buf, strlen(buf), 0);
     }
@@ -280,7 +293,7 @@ int main(const int argc, const char **argv) {
         socklen_t addr_len = sizeof(addr);
         int new_socket = accept(server, (struct sockaddr*) &addr, &addr_len);
         char buf[100];
-        read_socket(new_socket, &buf, sizeof(addr));
+        read_socket(new_socket, buf, sizeof(addr));
 
         if (new_socket >= 0) {
             fprintf(stdout, "Connection established\n");

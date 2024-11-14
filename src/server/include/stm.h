@@ -35,6 +35,8 @@ enum state_ids {
     STATE_TO_RETR,
 };
 
+struct Client;
+
 struct state_machine {
     /** declaración de cual es el estado inicial */
     unsigned                      initial;
@@ -48,7 +50,7 @@ struct state_machine {
     const struct state_definition *current;
 };
 
-struct selector_key *key;
+extern struct selector_key *key;
 
 /**
  * definición de un estado de la máquina de estados
@@ -96,6 +98,6 @@ stm_handler_block(struct state_machine *stm, struct selector_key *key);
 /** indica que ocurrió el evento close. retorna nuevo id de nuevo estado. */
 void stm_handler_close(struct state_machine *stm, struct selector_key *key);
 
-void stm_parse(char * buffer, struct selector_key *key, Client * client);
+void stm_parse(char * buffer, struct selector_key *key, struct Client * client);
 
 #endif

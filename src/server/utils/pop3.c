@@ -65,7 +65,7 @@ int initialize_pop_connection(int sock_fd, struct sockaddr_in client_address)
 
    if (sent_bytes < 0)
    {
-       LOG("Error sending welcome message to client\n");
+       fprintf(stderr, "Error sending welcome message to client\n");
        return -1; // Error
    }
 
@@ -90,10 +90,18 @@ void handle_stat(Client *client) {
 }
 
 void parse_command(char * buf, int socket) {
-
+    return;
 }
 
-void handle_list(Client * client);
-void handle_quit(Client * client);
-void handle_dele(Client * client,char * buffer);
-void handle_retr(Client * client,char * buffer);
+void handle_list(Client * client){
+    return;
+}
+void handle_quit(Client * client){
+    return;
+}
+void handle_dele(Client * client,char * buffer){
+    return;
+}
+void handle_retr(Client * client,char * buffer){
+    return;
+}
