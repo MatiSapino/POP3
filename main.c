@@ -189,7 +189,9 @@
 #include "src/server/include/selector.h"
 #include "src/server/include/user.h"
 #include <netinet/in.h>
+#include <poll.h>
 
+static struct pollfd fds[MAX_CLIENTS + 1];
 
 static bool done = false;
 
@@ -201,7 +203,11 @@ static void sigterm_handler(const int signal) {
 
 void read_socket(int socket, char *buf, size_t size ) {
 
-    struct selector_key selector_key = {NULL, socket, buf};
+    fds[0].fd = socket;
+    fds[0].events = POLLIN;
+    int nfds = 1;
+
+    struct selector_key key = {(fd_selector)poll(fds, nfds, -1), socket, buf};
 
     struct Client * client = create_user(socket, buf);
 
@@ -220,8 +226,8 @@ void read_socket(int socket, char *buf, size_t size ) {
             }
             return;
         }
-        stm_parse(buf, &selector_key, client);
-        fprintf(stderr, "%s", buf);
+        stm_parse(buf, &key, client);
+        // fprintf(stderr, "%s", buf);
         send(socket, buf, strlen(buf), 0);
     }
 }
@@ -250,7 +256,7 @@ int main(const int argc, const char **argv) {
     // nothing to read in stdin
     close(STDIN_FILENO);
 
-    pop_init(NULL);
+    //pop_init(NULL);
     const char *err_msg = NULL;
 
     struct sockaddr_in addr;

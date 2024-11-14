@@ -29,7 +29,7 @@ typedef struct Mailfile {
 } Mailfile;
 
 typedef struct Client {
-    char *buffer;
+    // char *buffer;
     char username[MAX_USERNAME_LENGTH + 1];
     bool authenticated;
     Mailfile mails[MAX_CLIENT_MAILS];

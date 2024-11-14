@@ -11,7 +11,7 @@ struct Client * create_user(int socket, char *buf){
     sm->initial = STATE_WAIT_USER;
     new_client->socket_fd = socket;
     new_client->stm = sm;
-    new_client->buffer = buf; 
+    // new_client->buffer = buf; 
     return new_client;
 }
 
