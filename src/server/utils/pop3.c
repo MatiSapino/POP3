@@ -105,3 +105,51 @@ void handle_dele(Client * client,char * buffer){
 void handle_retr(Client * client,char * buffer){
     return;
 }
+
+void passiveAccept(int serverSocket) {
+    struct sockaddr_storage clientAddr;
+    socklen_t clientAddrLen = sizeof(clientAddr);
+
+    struct Client * client = NULL;
+
+    int clientSocket = accept(serverSocket, (struct sockaddr *) &clientAddr, &clientAddrLen);
+    if (clientSocket == -1) {
+        handleError(clientSocket);
+        return;
+    }
+
+    client = calloc(1, sizeof(struct Client));
+    if (client == NULL) {
+        handleError(clientSocket);
+        return;
+    }
+
+    client->addr = clientAddr;
+
+    buffer_init(&client->inputBuffer, BUFFER_SIZE, client->inputBufferData);
+    buffer_init(&client->outputBuffer, BUFFER_SIZE, client->outputBufferData);
+
+    char * s = "+OK POP3 server ready\r\n";
+
+    for (int i = 0; s[i]; i++) {
+        buffer_write(&client->outputBuffer, s[i]);
+    }
+
+    client->stm.initial = STATE_WELCOME;
+    client->stm.max_state = STATE_ERROR;
+    client->stm.states = client_states;
+
+    stm_init(&client->stm);
+
+}
+
+static const struct state_definition client_states[] = {
+    {
+        .state = STATE_WELCOME,
+        .on_write_ready = welcomeClient,
+    }
+}
+
+static unsigned welcomeClient(Client * client){ {
+    struct Client * client = client;
+}

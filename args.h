@@ -5,6 +5,11 @@
 
 #define MAX_USERS 10
 
+struct pop3_args {
+    char * pop3_addr;
+    unsigned short pop3_port;
+};
+
 struct users {
     char *name;
     char *pass;
@@ -38,8 +43,7 @@ struct socks5args {
  * args con defaults o la seleccion humana. Puede cortar
  * la ejecución.
  */
-void 
-parse_args(const int argc, char **argv, struct socks5args *args);
+void parse_args(const int argc, char **argv, struct pop3_args *args);
 
 #endif
 

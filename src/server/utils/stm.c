@@ -4,6 +4,8 @@
  */
 #include <stdlib.h>
 #include "stm.h"
+#include <stdio.h>
+#include <ctype.h>
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
@@ -103,8 +105,25 @@ void stm_parse(char * buffer, struct selector_key *key, Client * client){
         return;
     }
 
+    char *origen = buffer;
+    char *destino = buffer;
+
+    while (*origen) {
+        if (!isspace((unsigned char)*origen)) {
+            *destino = *origen;
+            destino++;
+        }
+        origen++;
+    }
+    *destino = '\0';
+
+    size_t len = strlen(buffer);
+    if (len > 0 && buffer[len - 1] == '\n') {
+        buffer[len - 1] = '\0';
+    }
+
     if (strcmp(buffer, "USER") == 0) {
-        fprintf(stderr, "User command %s\n, buffer");
+        fprintf(stderr, "User command %s\n", buffer);
         jump(client->stm, STATE_WAIT_USERNAME, key);
     }
     // else if (client->stm->current->state == STATE_WAIT_USERNAME) {
@@ -159,7 +178,7 @@ void stm_parse(char * buffer, struct selector_key *key, Client * client){
     //     jump(client->stm, STATE_AUTHENTICATED, key);
     // }
     else {
-        fprintf(stderr, "Unknown command: %s\n", buffer);
+        fprintf(stderr, "Unknown command: %s", buffer);
             return;
     }
     

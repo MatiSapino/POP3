@@ -29,12 +29,18 @@ typedef struct Mailfile {
 } Mailfile;
 
 typedef struct Client {
-    // char *buffer;
-    char username[MAX_USERNAME_LENGTH + 1];
-    bool authenticated;
-    Mailfile mails[MAX_CLIENT_MAILS];
-    int socket_fd;
-    struct state_machine * stm;
+    struct sockaddr_storage addr;
+    struct buffer inputBuffer;
+    uint8_t inputBufferData[BUFFER_SIZE];
+    struct buffer outputBuffer;
+    uint8_t outputBufferData[BUFFER_SIZE];
+    struct state_machine stm;
+
+
+    // char username[MAX_USERNAME_LENGTH + 1];
+    // bool authenticated;
+    // Mailfile mails[MAX_CLIENT_MAILS];
+    // int socket_fd;
 } Client;
 
 enum pop3_state {
