@@ -5,15 +5,15 @@
 static size_t users_count = 0;
 
 
-struct Client * create_user(int socket, char *buf){
-    struct Client * new_client = malloc(sizeof(Client));
-    struct state_machine* sm = malloc(sizeof(struct state_machine));
-    sm->initial = STATE_WAIT_USER;
-    new_client->socket_fd = socket;
-    new_client->stm = sm;
-    // new_client->buffer = buf; 
-    return new_client;
-}
+// struct Client * create_user(int socket, char *buf){
+//     struct Client * new_client = malloc(sizeof(Client));
+//     struct state_machine* sm = malloc(sizeof(struct state_machine));
+//     sm->initial = STATE_WAIT_USER;
+//     new_client->socket_fd = socket;
+//     new_client->stm = sm;
+//     // new_client->buffer = buf; 
+//     return new_client;
+// }
 
 //validacion del nombre de usuario seguro
 bool user_authenticate(const char *username) {
