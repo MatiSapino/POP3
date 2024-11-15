@@ -107,56 +107,56 @@ void stm_parse(char * buffer, struct selector_key *key, Client * client){
         fprintf(stderr, "User command %s\n, buffer");
         jump(client->stm, STATE_WAIT_USERNAME, key);
     }
-    // else if (client->stm->current->state == STATE_WAIT_USERNAME) {
+    // else if (user->stm->current->state == STATE_WAIT_USERNAME) {
     //     bool valid = check_user(buffer, "maildir");
 
     //     if (valid) {
-    //         jump(client->stm, STATE_WAIT_PASS, key);
+    //         jump(user->stm, STATE_WAIT_PASS, key);
     //     } else {
     //         fprintf(stderr, "User not valid\n");
     //         return;
     //     }
     // }
-    // else if (client->stm->current->state == STATE_WAIT_PASS) {
+    // else if (user->stm->current->state == STATE_WAIT_PASS) {
     //     if (strcmp(buffer, "PASS") == 0) {
-    //         jump(client->stm, STATE_WAIT_PASSWORD, key);
+    //         jump(user->stm, STATE_WAIT_PASSWORD, key);
     //     }
     // }
-    // else if (client->stm->current->state == STATE_WAIT_PASSWORD) {
+    // else if (user->stm->current->state == STATE_WAIT_PASSWORD) {
     //     bool valid = check_password("username", buffer, "maildir");
 
     //     if (valid) {
-    //         jump(client->stm, STATE_AUTHENTICATED, key);
+    //         jump(user->stm, STATE_AUTHENTICATED, key);
     //     } else {
     //         fprintf(stderr, "Password not valid\n");
     //         return;
     //     }
     // }
-    // else if (client->stm->current->state == STATE_AUTHENTICATED) {
+    // else if (user->stm->current->state == STATE_AUTHENTICATED) {
     //     fprintf(stderr, "Authenticated\n");
     //     if (strcmp(buffer, "STAT") == 0) {
-    //         handle_stat(client);
+    //         handle_stat(user);
     //     }
     //     else if (strcmp(buffer, "LIST") == 0) {
-    //         handle_list(client);
+    //         handle_list(user);
     //     }
     //     else if(strcmp(buffer, "QUIT")){
-    //         handle_quit(client);
+    //         handle_quit(user);
     //     }
     //     else if (strcmp(buffer, "DELE")==0){
-    //         jump(client->stm, STATE_TO_DELE, key);  
+    //         jump(user->stm, STATE_TO_DELE, key);
     //     }
     //     else if (strcmp(buffer, "RETR") == 0) {
-    //         jump(client->stm, STATE_TO_RETR, key);
+    //         jump(user->stm, STATE_TO_RETR, key);
     //     }
     // }
-    // else if (client->stm->current->state == STATE_TO_DELE) {
-    //     handle_dele(client, buffer);
-    //     jump(client->stm, STATE_AUTHENTICATED, key);
+    // else if (user->stm->current->state == STATE_TO_DELE) {
+    //     handle_dele(user, buffer);
+    //     jump(user->stm, STATE_AUTHENTICATED, key);
     // }
-    // else if (client->stm->current->state == STATE_TO_RETR) {
-    //     handle_retr(client, buffer);
-    //     jump(client->stm, STATE_AUTHENTICATED, key);
+    // else if (user->stm->current->state == STATE_TO_RETR) {
+    //     handle_retr(user, buffer);
+    //     jump(user->stm, STATE_AUTHENTICATED, key);
     // }
     else {
         fprintf(stderr, "Unknown command: %s\n", buffer);

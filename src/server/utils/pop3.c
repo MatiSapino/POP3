@@ -65,7 +65,7 @@ int initialize_pop_connection(int sock_fd, struct sockaddr_in client_address)
 
    if (sent_bytes < 0)
    {
-       fprintf(stderr, "Error sending welcome message to client\n");
+       fprintf(stderr, "Error sending welcome message to user\n");
        return -1; // Error
    }
 

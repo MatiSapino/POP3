@@ -212,7 +212,7 @@ void read_socket(int socket, char *buf, size_t size ) {
     struct Client * client = create_user(socket, buf);
 
     if (client == NULL) {
-        perror("Failed to create client");
+        perror("Failed to create user");
         return;
     }
 
@@ -220,7 +220,7 @@ void read_socket(int socket, char *buf, size_t size ) {
         ssize_t bytes_read = read(socket, buf, size);
         if (bytes_read <= 0) {
             if (bytes_read == 0) {
-                fprintf(stderr, "Connection closed by client\n");
+                fprintf(stderr, "Connection closed by user\n");
             } else {
                 perror("Error reading from socket");
             }

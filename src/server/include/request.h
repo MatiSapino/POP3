@@ -97,7 +97,7 @@ struct request_parser {
  * "...
  * 6.  Replies
  *
- * The SOCKS request information is sent by the client as soon as it has
+ * The SOCKS request information is sent by the user as soon as it has
  * established a connection to the SOCKS server, and completed the
  * authentication negotiations.  The server evaluates the request, and
  * returns a reply formed as follows:
