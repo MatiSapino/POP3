@@ -15,56 +15,19 @@
 #include <poll.h>
 #include <arpa/inet.h>
 
+#define SELECTOR_SIZE 1024
+
 static int setupSocket(char * addr, int port);
 static void handleError(int newSocket);
 
 extern struct pop3_args pop3_args;
 int serverSocket = -1;
 
-
-
-
-static struct pollfd fds[MAX_CLIENTS + 1];
-
-static bool done = false;
+bool done = false;
 
 static void sigterm_handler(const int signal) {
     printf("signal %d, cleaning up and exiting\n",signal);
     done = true;
-}
-
-
-void read_socket(int socket, char *buf, size_t size ) {
-
-    fds[0].fd = socket;
-    fds[0].events = POLLIN;
-    int nfds = 1;
-
-    struct selector_key key = {(fd_selector)poll(fds, nfds, -1), socket, buf};
-
-    struct Client * client = create_user(socket, buf);
-
-    stm_init(client->stm);
-
-    if (client == NULL) {
-        perror("Failed to create client");
-        return;
-    }
-
-    while (1) {
-        ssize_t bytes_read = read(socket, buf, size);
-        if (bytes_read <= 0) {
-            if (bytes_read == 0) {
-                fprintf(stderr, "Connection closed by client\n");
-            } else {
-                perror("Error reading from socket");
-            }
-            return;
-        }
-        stm_parse(buf, &key, client);
-        // fprintf(stderr, "%s", buf);
-        send(socket, buf, strlen(buf), 0);
-    }
 }
 
 int main(const int argc, const char **argv) {
@@ -74,17 +37,39 @@ int main(const int argc, const char **argv) {
 
     int ret = -1;
 
+    const struct selector_init init = {
+        .signal = SIGALRM,
+        .select_timeout = {
+            .tv_sec = 10,
+            .tv_nsec = 0,
+        },
+    };
+
+    fd_selector selector = NULL;
+    selector_status selectStatus = selector_init(&init);
+    if (selectStatus != SELECTOR_SUCCESS) {
+        goto finally;
+    }
+
     serverSocket = setupSocket(
         (pop3_args.pop3_addr == NULL ? "0.0.0.0" : pop3_args.pop3_addr),
         pop3_args.pop3_port
     )
-
     if (serverSocket == -1) {
         goto finally;
     }
 
     signal(SIGTERM, sigterm_handler);
     signal(SIGINT,  sigterm_handler);
+
+    if (serverSocket != -1 && selector_fd_set_nio(serverSocket) == -1) {
+        goto finally;
+    }
+
+    selector = selector_new(SELECTOR_SIZE);
+    if (selector == NULL) {
+        goto finally;
+    }
 
     const fd_handler passiveHandler = {
         .handle_read = passiveAccept,
@@ -93,102 +78,41 @@ int main(const int argc, const char **argv) {
         .handle_close = NULL
     }
     
-
-    unsigned port = 1080;
-
-    if (argc == 1) {
-        // use default
-    } else if (argc == 2) {
-        char *end = 0;
-        const long sl = strtol(argv[1], &end, 10);
-
-        if (end == argv[1] || '\0' != *end
-           || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno)
-           || sl < 0 || sl > USHRT_MAX) {
-            fprintf(stderr, "port should be an integer: %s\n", argv[1]);
-            return 1;
-           }
-        port = sl;
-    } else {
-        fprintf(stderr, "Usage: %s <port>\n", argv[0]);
-        return 1;
-    }
-
-    // nothing to read in stdin
-    close(STDIN_FILENO);
-
-    //pop_init(NULL);
-    const char *err_msg = NULL;
-
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
-    addr.sin_port = htons(port);
-
-    const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (server < 0) {
-        err_msg = "unable to create socket";
+    selectStatus = selector_register(
+        selector,
+        serverSocket,
+        &passiveHandler,
+        OP_READ,
+        NULL
+    );
+    if (selectStatus != SELECTOR_SUCCESS) {
         goto finally;
     }
 
-    fprintf(stdout, "Listening on TCP port %d\n", port);
-
-    // man 7 ip. dont matter report if fails.
-    setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-
-    //Asocia el socket con el puerto especificado.
-    if (bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
-        err_msg = "unable to bind socket";
-        goto finally;
-    }
-
-    //El socket espera conexiones entrantes, hasta 20 en la cola
-    if (listen(server, 20) < 0) {
-        err_msg = "unable to listen";
-        goto finally;
-    }
-
-    // registrar sigterm es útil para terminar el programa normalmente.
-    // esto ayuda mucho en herramientas como valgrind.
-    signal(SIGTERM, sigterm_handler);
-    signal(SIGINT,  sigterm_handler);
-
-    //Se corre esto siempre esperando conexiones al socket que creamos antes
-    //selector_select() espera conexiones
-    for(;!done;) {
-        socklen_t addr_len = sizeof(addr);
-        int new_socket = accept(server, (struct sockaddr*) &addr, &addr_len);
-        char buf[100];
-        read_socket(new_socket, buf, sizeof(addr));
-
-        if (new_socket >= 0) {
-            fprintf(stdout, "Connection established\n");
-        }
-        if (new_socket < 0) {
-            err_msg = "Unable to accept";
+    while (!done) {
+        selectStatus = selector_select(selector);
+        if (selectStatus != SELECTOR_SUCCESS) {
             goto finally;
         }
-        err_msg = NULL;
-    }
-
-    if (err_msg == NULL) {
-        err_msg = "closing";
     }
 
     int ret = 0;
 
     finally:
-         if (err_msg) {
-            perror(err_msg);
-            ret = 1;
+        if (selectStatus != SELECTOR_SUCCESS) {
+            fprintf(stderr, "Error: %s\n", selector_error(selectStatus));
+            if (selectStatus == SELECTOR_IO) {
+                fprintf(stderr, "Errno: %s\n", strerror(errno));
+            }
         }
-
-        // socksv5_pool_destroy();
-
-        if (server >= 0) {
-            close(server);
+        if (selector != NULL) {
+            selector_destroy(selector);
         }
+        selector_close();
+        if (serverSocket >= 0) {
+            close(serverSocket);
+        }
+        
         return ret;
 }
 
