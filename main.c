@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include "src/server/include/selector.h"
-#include "src/server/include/args.h"
+#include "args.h"
 #include "src/server/include/user.h"
 #include <netinet/in.h>
 #include <poll.h>
@@ -30,7 +30,7 @@ static void sigterm_handler(const int signal) {
     done = true;
 }
 
-int main(const int argc, const char **argv) {
+int main(const int argc, char **argv) {
     parse_args(argc, argv, &pop3_args);
 
     close(STDIN_FILENO);
@@ -54,7 +54,7 @@ int main(const int argc, const char **argv) {
     serverSocket = setupSocket(
         (pop3_args.pop3_addr == NULL ? "0.0.0.0" : pop3_args.pop3_addr),
         pop3_args.pop3_port
-    )
+    );
     if (serverSocket == -1) {
         goto finally;
     }
@@ -76,7 +76,7 @@ int main(const int argc, const char **argv) {
         .handle_write = NULL,
         .handle_block = NULL,
         .handle_close = NULL
-    }
+    };
     
     selectStatus = selector_register(
         selector,
@@ -96,7 +96,7 @@ int main(const int argc, const char **argv) {
         }
     }
 
-    int ret = 0;
+    ret = 0;
 
     finally:
         if (selectStatus != SELECTOR_SUCCESS) {

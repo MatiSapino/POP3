@@ -10,6 +10,7 @@
 #include <string.h>
 #include "stm.h"
 #include "user.h"
+#include "selector.h"
 
 #define MAX_POP3_ARG_LENGTH 40
 #define MAX_USERNAME_LENGTH MAX_POP3_ARG_LENGTH
@@ -44,24 +45,28 @@ typedef struct Client {
 } Client;
 
 enum pop3_state {
-    POP3_WRITE,
-    POP3_READ,
-    POP3_CLOSE,
-    POP3_ERROR,
+    STATE_WELCOME,
+    STATE_READ,
+    STATE_WRITE,
+    STATE_FILE_WRITE,
+    STATE_CLOSE,
+    STATE_ERROR,
 };
 
 /*
 Inicializa el servidor, configura el directorio donde están los archivos de correo, 
 si no existe lo crea. Crea el vector con los datos de conexión de clientes. 
 */
-void pop_init(char * dir_name);
+// void pop_init(char * dir_name);
 
-int initialize_pop_connection(int sock_fd, struct sockaddr_in client_address);
-void handle_stat(Client *client);
-void handle_list(Client * client);
-void handle_quit(Client * client);
-void handle_dele(Client * client,char * buffer);
-void handle_retr(Client * client,char * buffer);
+void passiveAccept(struct selector_key *key);
+
+// int initialize_pop_connection(int sock_fd, struct sockaddr_in client_address);
+// void handle_stat(Client *client);
+// void handle_list(Client * client);
+// void handle_quit(Client * client);
+// void handle_dele(Client * client,char * buffer);
+// void handle_retr(Client * client,char * buffer);
 
 
 #endif

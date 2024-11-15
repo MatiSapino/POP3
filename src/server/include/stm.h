@@ -1,9 +1,8 @@
 #ifndef STM_H_wL7YxN65ZHqKGvCPrNbPtMJgL8B
 #define STM_H_wL7YxN65ZHqKGvCPrNbPtMJgL8B
 
-#include <stdbool.h>
-#include <stdio.h>
-#include "pop3.h"
+#include <selector.h>
+
 /**
  * stm.c - pequeño motor de maquina de estados donde los eventos son los
  *         del selector.c
@@ -23,18 +22,6 @@
  * Provee todas las funciones necesitadas en un `struct fd_handler'
  * de selector.c.
  */
-
-
-enum state_ids {
-    STATE_WELCOME,
-    STATE_READ,
-    STATE_WRITE,
-    STATE_FILE_WRITE,
-    STATE_CLOSE,
-    STATE_ERROR,
-};
-
-struct Client;
 
 struct state_machine {
     /** declaración de cual es el estado inicial */
@@ -96,7 +83,5 @@ stm_handler_block(struct state_machine *stm, struct selector_key *key);
 
 /** indica que ocurrió el evento close. retorna nuevo id de nuevo estado. */
 void stm_handler_close(struct state_machine *stm, struct selector_key *key);
-
-void stm_parse(char * buffer, struct selector_key *key, struct Client * client);
 
 #endif
