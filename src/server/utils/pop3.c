@@ -57,6 +57,16 @@ void okResponse(struct Client * client, const char * message) {
     buffer_write_adv(&client->outputBuffer, count);
 }
 
+void response(struct Client * client, const char * message) {
+    size_t limit;
+    uint8_t * buffer;
+    ssize_t count;
+
+    buffer = buffer_write_ptr(&client->outputBuffer, &limit);
+    count = snprintf((char *) buffer, limit, "%s\r\n", message);
+    buffer_write_adv(&client->outputBuffer, count);
+}
+
 static enum pop3_state parseInput(struct selector_key * selector_key, struct Client * client) {
     enum pop3_state state;
     while (buffer_can_read(&client->inputBuffer) && buffer_fits(&client->outputBuffer, BUFFER_SPACE)) {
@@ -69,7 +79,14 @@ static enum pop3_state parseInput(struct selector_key * selector_key, struct Cli
 
             return state;
         }
+
+        if (commandState == CMD_INVALID) {
+            errResponse(client, "Invalid command");
+            return STATE_WRITE;
+        }
     }
+
+    return STATE_READ;
 }
 
 static unsigned readCommand(struct selector_key * selector_key) {
