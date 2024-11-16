@@ -7,6 +7,14 @@
 #include "pop3.h"
 #include "stm.h"
 
+#define MAX_USERNAME 40
+#define MAX_PASSWORD 40
+
+struct user {
+    char username[MAX_USERNAME];
+    char password[MAX_PASSWORD];
+};
+
 
 bool user_authenticate(const char *username);
 bool check_password(const char *username, const char *pass, const char *maildir);

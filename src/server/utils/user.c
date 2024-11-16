@@ -1,6 +1,7 @@
 #include <string.h>
 
 #include "user.h"
+#include "pop3.h"
 
 static size_t users_count = 0;
 

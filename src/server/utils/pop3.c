@@ -1,5 +1,8 @@
 #include "pop3.h"
 
+#include <commandParse.h>
+#include <pop3_commands.h>
+
 //struct command_function {
 //    char *name;
 //    enum pop3_state (*function)(struct selector_key *key, struct command *command);
@@ -140,10 +143,115 @@ handle_error:
     return STATE_ERROR;
 }
 
+void okResponse(struct Client * client, const char * message) {
+    size_t limit;
+    uint8_t * buffer;
+    ssize_t count;
+
+    buffer = buffer_read_ptr(&client->outputBuffer, &limit);
+    count = snprintf((char *) buffer, limit, "+OK %s\r\n", message);
+    buffer_write_adv(&client->outputBuffer, count);
+}
+
+static enum pop3_state parseInput(struct selector_key * selector_key, struct Client * client) {
+    enum pop3_state state;
+    while (buffer_can_read(&client->inputBuffer)) {
+        state = executeCommand(selector_key, client->commandParse->command);
+    }
+}
+
+static unsigned readCommand(struct selector_key * selector_key) {
+    struct Client * client = selector_key->data;
+
+    size_t limit;
+    ssize_t count;
+    uint8_t * buffer;
+    selector_status status;
+    enum pop3_state states;
+
+    buffer = buffer_write_ptr(&client->inputBuffer, &limit);
+    // TODO: check flags
+    count = recv(selector_key->fd, buffer, limit, 0);
+
+    if (count <= 0 && limit != 0) {
+        goto handle_error;
+    }
+
+    buffer_write_adv(&client->inputBuffer, count);
+
+    states = parseInput(selector_key, client);
+
+    switch (states) {
+        case STATE_WRITE:
+            status = selector_set_interest_key(selector_key, OP_WRITE);
+            if (status != SELECTOR_SUCCESS) {
+                goto handle_error;
+            }
+            return STATE_WRITE;
+        case STATE_READ:
+            goto handle_error;
+        default:
+            return states;
+    }
+
+handle_error:
+    status = selector_set_interest_key(selector_key, OP_WRITE);
+    if (status != SELECTOR_SUCCESS) {
+        selector_set_interest_key(selector_key, OP_NOOP);
+    }
+
+    return STATE_ERROR;
+}
+
+static unsigned writeToClient(struct selector_key * selector_key) {
+    struct Client * client = selector_key->data;
+
+    size_t limit;
+    ssize_t count;
+    uint8_t * buffer;
+    selector_status status;
+    enum pop3_state states;
+
+    buffer = buffer_read_ptr(&client->outputBuffer, &limit);
+    // TODO: check flags
+    count = send(selector_key->fd, buffer, limit, 0);
+
+    if (count <= 0 && limit != 0) {
+        goto handle_error;
+    }
+
+    buffer_write_adv(&client->outputBuffer, count);
+
+    handle_error:
+
+    selector_set_interest_key(selector_key, OP_NOOP);
+    return STATE_ERROR;
+}
+
 static const struct state_definition client_states[] = {
     {
         .state = STATE_WELCOME,
         .on_write_ready = welcomeClient,
+    },
+    {
+        .state = STATE_READ,
+        .on_read_ready = readCommand,
+    },
+    {
+        .state = STATE_WRITE,
+        .on_read_ready = writeToClient,
+    },
+    // {
+    //     .state = STATE_FILE_WRITE,
+    //     .on_write_ready = writeFile,
+    //     .on_departure = stopWriteFile,
+    // },
+    {
+        .state = STATE_CLOSE,
+    },
+    {
+        .state = STATE_ERROR,
+        .on_read_ready = writeToClient,
     }
 };
 
@@ -229,6 +337,7 @@ void passiveAccept(struct selector_key * key) {
     client->stm.initial = STATE_WELCOME;
     client->stm.max_state = STATE_ERROR;
     client->stm.states = client_states;
+    client->commandParse = commandParseInit();
 
     stm_init(&client->stm);
 

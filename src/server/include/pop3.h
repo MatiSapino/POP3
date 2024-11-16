@@ -37,6 +37,10 @@ typedef struct Client {
     uint8_t outputBufferData[BUFFER_SIZE];
     struct state_machine stm;
 
+    struct commandParse * commandParse;
+
+    struct user * user;
+
 
     // char username[MAX_USERNAME_LENGTH + 1];
     // bool authenticated;
@@ -67,6 +71,8 @@ void passiveAccept(struct selector_key *key);
 // void handle_quit(Client * client);
 // void handle_dele(Client * client,char * buffer);
 // void handle_retr(Client * client,char * buffer);
+
+void okResponse(struct Client * client, const char * message);
 
 
 #endif
