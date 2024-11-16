@@ -95,6 +95,8 @@ struct buffer {
     uint8_t *write;
 };
 
+#define BUFFER_SPACE 512
+
 /**
  * inicializa el buffer sin utilizar el heap
  */
@@ -144,6 +146,8 @@ buffer_can_read(buffer *b);
 /** retorna true si se pueden escribir bytes en el buffer */
 bool
 buffer_can_write(buffer *b);
+
+bool buffer_fits(buffer *b, size_t n);
 
 
 #endif

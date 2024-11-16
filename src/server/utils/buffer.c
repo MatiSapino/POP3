@@ -101,3 +101,7 @@ buffer_compact(buffer *b) {
         b->write = b->data + n;
     }
 }
+
+bool buffer_fits(buffer *b, size_t n) {
+    return b->limit - b->write >= n;
+}

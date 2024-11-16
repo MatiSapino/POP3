@@ -155,7 +155,7 @@ void okResponse(struct Client * client, const char * message) {
 
 static enum pop3_state parseInput(struct selector_key * selector_key, struct Client * client) {
     enum pop3_state state;
-    while (buffer_can_read(&client->inputBuffer)) {
+    while (buffer_can_read(&client->inputBuffer) && buffer_fits(&client->outputBuffer, BUFFER_SPACE)) {
         state = executeCommand(selector_key, client->commandParse->command);
     }
 }
