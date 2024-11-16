@@ -52,7 +52,7 @@ int main(const int argc, char **argv) {
     }
 
     serverSocket = setupSocket(
-        (pop3_args.pop3_addr == NULL ? "0.0.0.0" : pop3_args.pop3_addr),
+        pop3_args.pop3_addr == NULL ? "::" : pop3_args.pop3_addr,
         pop3_args.pop3_port
     );
     if (serverSocket == -1) {
@@ -118,7 +118,7 @@ int main(const int argc, char **argv) {
 
 static int setupSocket(char * addr, int port) {
 
-    struct sockaddr_in serverAddr;
+    struct sockaddr_in6 serverAddr;
     int newSocket = -1;
 
     if (port < 0) {
@@ -126,7 +126,7 @@ static int setupSocket(char * addr, int port) {
         return -1;
     }
 
-    newSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    newSocket = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
 
     if (newSocket < 0) {
         fprintf(stderr, "Failed to create socket\n");
@@ -139,11 +139,11 @@ static int setupSocket(char * addr, int port) {
     }
 
     memset(&serverAddr, 0, sizeof(serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
-    serverAddr.sin_port = htons(port);
+    serverAddr.sin6_family = AF_INET6;
+    serverAddr.sin6_addr = in6addr_any;
+    serverAddr.sin6_port = htons(port);
 
-    if (inet_pton(AF_INET, addr, &serverAddr.sin_addr) < 0) {
+    if (inet_pton(AF_INET6, addr, &serverAddr.sin6_addr) < 0) {
         fprintf(stderr, "Invalid address/ Address not supported\n");
         handleError(newSocket);
         return -1;
