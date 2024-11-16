@@ -222,10 +222,71 @@ static unsigned writeToClient(struct selector_key * selector_key) {
 
     buffer_write_adv(&client->outputBuffer, count);
 
-    handle_error:
+    if (buffer_can_read(&client->outputBuffer)) {
+        return STATE_WRITE;
+    }
+
+    states = parseInput(selector_key, client);
+
+    if (states == STATE_READ) {
+        status = selector_set_interest_key(selector_key, OP_READ);
+        if (status != SELECTOR_SUCCESS) {
+            goto handle_error;
+        }
+        return STATE_READ;
+    }
+    if (states == STATE_ERROR) {
+        goto handle_error;
+    }
+    return states;
+
+handle_error:
 
     selector_set_interest_key(selector_key, OP_NOOP);
     return STATE_ERROR;
+}
+
+static unsigned int writeToFile(struct selector_key * selector_key) {
+    struct Client * client = selector_key->data;
+
+    size_t limit;
+    ssize_t count;
+    uint8_t * buffer;
+    selector_status status;
+    enum pop3_state states;
+
+    buffer = buffer_read_ptr(&client->outputBuffer, &limit);
+    // TODO: check send flags
+    count = send(selector_key->fd, buffer, limit, 0);
+
+    if (count < 0 && limit != 0) {
+        goto handle_error;
+    }
+
+    buffer_write_adv(&client->outputBuffer, count);
+
+    if (buffer_can_read(&client->outputBuffer)) {
+        return STATE_FILE_WRITE;
+    }
+
+    status = selector_set_interest_key(selector_key, OP_READ);
+    if (status != SELECTOR_SUCCESS) {
+        goto handle_error;
+    }
+    status = selector_set_interest_key(selector_key, OP_NOOP);
+    if (status != SELECTOR_SUCCESS) {
+        goto handle_error;
+    }
+    return STATE_FILE_WRITE;
+
+    handle_error:
+    selector_set_interest_key(selector_key, OP_NOOP);
+    return STATE_ERROR;
+}
+
+static void stopWriteToFile(const enum pop3_state states, struct selector_key * selector_key) {
+    struct Client * client = selector_key->data;
+    selector_unregister_fd(selector_key->s, selector_key->fd);
 }
 
 static const struct state_definition client_states[] = {
@@ -241,11 +302,11 @@ static const struct state_definition client_states[] = {
         .state = STATE_WRITE,
         .on_read_ready = writeToClient,
     },
-    // {
-    //     .state = STATE_FILE_WRITE,
-    //     .on_write_ready = writeFile,
-    //     .on_departure = stopWriteFile,
-    // },
+    {
+        .state = STATE_FILE_WRITE,
+        .on_write_ready = writeToFile,
+        .on_departure = stopWriteToFile,
+    },
     {
         .state = STATE_CLOSE,
     },
