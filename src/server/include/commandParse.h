@@ -29,4 +29,6 @@ struct commandParse {
 
 struct commandParse * commandParseInit();
 
+enum commandState valid_command(buffer * inputBuffer, struct commandParse * commandParse);
+
 #endif //COMMANDPARSE_H
