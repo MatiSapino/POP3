@@ -253,7 +253,9 @@ static const struct state_definition client_states[] = {
 static void closeConnection(struct selector_key * key) {
     struct Client * client = key->data;
 
-    // TODO: i need to destroy the command parser
+    if (client->commandParse != NULL) {
+        free_commandParser(client->commandParse);
+    }
 
     if (key->fd != -1) {
         selector_unregister_fd(key->s, key->fd);

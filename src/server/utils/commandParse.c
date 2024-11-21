@@ -1,5 +1,6 @@
 #include "commandParse.h"
 #include <stdlib.h>
+#include <string.h>
 
 struct commandParse * commandParseInit() {
   struct commandParse * commandParse = malloc(sizeof(struct commandParse));
@@ -16,6 +17,13 @@ void reset_commandParser(struct commandParse * command_parse) {
   command_parse->state = command_parse->prevState = CMD_DISPATCHER;
   command_parse->bytes = 0;
   command_parse->command->args1 = command_parse->command->args2 = NULL;
+}
+
+void free_commandParser(struct commandParse * command_parse) {
+  memset(command_parse->command, 0, sizeof(struct command));
+  free(command_parse->command);
+  memset(command_parse, 0, sizeof(struct commandParse));
+  free(command_parse);
 }
 
 static enum commandState parse_command(struct commandParse * commandParse, uint8_t c) {
