@@ -19,6 +19,11 @@ void reset_commandParser(struct commandParse * command_parse) {
   command_parse->command->args1 = command_parse->command->args2 = NULL;
 }
 
+static void reset_command_parser(struct commandParse * command_parse) {
+  command_parse->bytes = 0;
+  command_parse->command->args1 = command_parse->command->args2 = NULL;
+}
+
 void free_commandParser(struct commandParse * command_parse) {
   memset(command_parse->command, 0, sizeof(struct command));
   free(command_parse->command);
@@ -43,7 +48,7 @@ static enum commandState parse_command(struct commandParse * commandParse, uint8
                         ? (commandParse->prevState == CMD_INVALID) ? CMD_DISPATCHER : CMD_OK
                         : CMD_INVALID;
     if (commandParse->state == CMD_DISPATCHER) {
-      // TODO: reset parser;
+      reset_command_parser(commandParse);
     } else if (commandParse->state == CMD_OK) {
       commandParse->command->data[commandParse->bytes - 2] = '\0';
       commandParse->command->data[commandParse->bytes - 1] = '\0';
