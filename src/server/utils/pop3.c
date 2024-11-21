@@ -74,9 +74,7 @@ static enum pop3_state parseInput(struct selector_key * selector_key, struct Cli
 
         if (commandState == CMD_OK) {
             state = executeCommand(selector_key, client->commandParse->command);
-
-            // TODO: reset paser
-
+            reset_commandParser(client->commandParse);
             return state;
         }
 

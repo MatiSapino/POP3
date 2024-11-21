@@ -12,6 +12,12 @@ struct commandParse * commandParseInit() {
   return commandParse;
 }
 
+void reset_commandParser(struct commandParse * command_parse) {
+  command_parse->state = command_parse->prevState = CMD_DISPATCHER;
+  command_parse->bytes = 0;
+  command_parse->command->args1 = command_parse->command->args2 = NULL;
+}
+
 static enum commandState parse_command(struct commandParse * commandParse, uint8_t c) {
   commandParse->command->data[commandParse->bytes] = c;
   commandParse->bytes++;

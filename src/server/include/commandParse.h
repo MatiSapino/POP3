@@ -29,6 +29,8 @@ struct commandParse {
 
 struct commandParse * commandParseInit();
 
+void reset_commandParser(struct commandParse * command_parse);
+
 enum commandState valid_command(buffer * inputBuffer, struct commandParse * commandParse);
 
 #endif //COMMANDPARSE_H
