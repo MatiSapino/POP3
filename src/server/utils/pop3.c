@@ -151,7 +151,9 @@ static unsigned writeToClient(struct selector_key * selector_key) {
 
     buffer_read_adv(&client->outputBuffer, count);
 
-    // TODO: i need to close the connection
+    if (client->closed) {
+        return STATE_ERROR;
+    }
 
     if (buffer_can_read(&client->outputBuffer)) {
         return STATE_WRITE;

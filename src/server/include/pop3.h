@@ -41,11 +41,7 @@ typedef struct Client {
 
     struct user * user;
 
-
-    // char username[MAX_USERNAME_LENGTH + 1];
-    // bool authenticated;
-    // Mailfile mails[MAX_CLIENT_MAILS];
-    // int socket_fd;
+    bool closed;
 } Client;
 
 enum pop3_state {
