@@ -3,6 +3,11 @@
 #include <commandParse.h>
 #include <pop3_commands.h>
 
+// allow to work on macOS
+#ifndef MSG_NOSIGNAL
+#define MSG_NOSIGNAL 0x4000
+#endif
+
 static unsigned welcomeClient(struct selector_key * selector_key) {
     struct Client * client = selector_key->data;
 
@@ -12,8 +17,7 @@ static unsigned welcomeClient(struct selector_key * selector_key) {
     selector_status status;
 
     buffer = buffer_read_ptr(&client->outputBuffer, &limit);
-    // TODO: check flags in send
-    count = send(selector_key->fd, buffer, limit, 0);
+    count = send(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count <= 0) {
         goto handle_error;
@@ -97,8 +101,7 @@ static unsigned readCommand(struct selector_key * selector_key) {
     enum pop3_state states;
 
     buffer = buffer_write_ptr(&client->inputBuffer, &limit);
-    // TODO: check flags
-    count = recv(selector_key->fd, buffer, limit, 0);
+    count = recv(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count <= 0 && limit != 0) {
         goto handle_error;
@@ -140,14 +143,15 @@ static unsigned writeToClient(struct selector_key * selector_key) {
     enum pop3_state states;
 
     buffer = buffer_read_ptr(&client->outputBuffer, &limit);
-    // TODO: check flags
-    count = send(selector_key->fd, buffer, limit, 0);
+    count = send(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count <= 0 && limit != 0) {
         goto handle_error;
     }
 
     buffer_read_adv(&client->outputBuffer, count);
+
+    // TODO: i need to close the connection
 
     if (buffer_can_read(&client->outputBuffer)) {
         return STATE_WRITE;
@@ -183,8 +187,7 @@ static unsigned int writeToFile(struct selector_key * selector_key) {
     enum pop3_state states;
 
     buffer = buffer_read_ptr(&client->outputBuffer, &limit);
-    // TODO: check send flags
-    count = send(selector_key->fd, buffer, limit, 0);
+    count = send(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count < 0 && limit != 0) {
         goto handle_error;
@@ -195,6 +198,8 @@ static unsigned int writeToFile(struct selector_key * selector_key) {
     if (buffer_can_read(&client->outputBuffer)) {
         return STATE_FILE_WRITE;
     }
+
+    // TODO: email send to user needs to be here
 
     status = selector_set_interest_key(selector_key, OP_READ);
     if (status != SELECTOR_SUCCESS) {
@@ -214,6 +219,8 @@ static unsigned int writeToFile(struct selector_key * selector_key) {
 static void stopWriteToFile(const enum pop3_state states, struct selector_key * selector_key) {
     struct Client * client = selector_key->data;
     selector_unregister_fd(selector_key->s, selector_key->fd);
+
+    // TODO: need to add the finalization of the email
 }
 
 static const struct state_definition client_states[] = {
@@ -246,10 +253,14 @@ static const struct state_definition client_states[] = {
 static void closeConnection(struct selector_key * key) {
     struct Client * client = key->data;
 
+    // TODO: i need to destroy the command parser
+
     if (key->fd != -1) {
         selector_unregister_fd(key->s, key->fd);
         close(key->fd);
     }
+
+    // TODO: i need to close the email fd
 
     free(client);
 }
