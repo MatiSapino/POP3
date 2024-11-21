@@ -190,7 +190,7 @@ static unsigned int writeToFile(struct selector_key * selector_key) {
         goto handle_error;
     }
 
-    buffer_write_adv(&client->outputBuffer, count);
+    buffer_read_adv(&client->outputBuffer, count);
 
     if (buffer_can_read(&client->outputBuffer)) {
         return STATE_FILE_WRITE;
