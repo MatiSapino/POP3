@@ -69,6 +69,8 @@ void passiveAccept(struct selector_key *key);
 // void handle_retr(Client * client,char * buffer);
 
 void okResponse(struct Client * client, const char * message);
+void errResponse(struct Client * client, const char * message);
+
 
 
 #endif
