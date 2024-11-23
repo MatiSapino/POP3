@@ -1,5 +1,4 @@
 #include "commandParse.h"
-#include "pop3_commands.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -78,21 +77,11 @@ static enum commandState parse_command(struct commandParse * commandParse, uint8
   return commandParse->state;
 }
 
-enum pop3_state valid_command(buffer * inputBuffer, struct commandParse * commandParse) {
+enum commandState valid_command(buffer * inputBuffer, struct commandParse * commandParse) {
   enum commandState state = commandParse->state;
-  enum pop3_state return_state;
   if (buffer_can_read(inputBuffer)) {
     state = parse_command(commandParse, buffer_read(inputBuffer));
-    if(state == CMD_OK){
-      //Command has correct form, now i can execute the command.
-      //Ver que argumentos recibe 
-      //return_state = executeCommand();
-      reset_command_parser(commandParse);
-      return return_state;
-    } else if(state == CMD_INVALID){
-      //User command has invalid form, error msg
-      return STATE_WRITE;
-    }
   }
-  return STATE_READ;
+
+  return state;
 }
