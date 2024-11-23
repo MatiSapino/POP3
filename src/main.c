@@ -8,13 +8,13 @@
 #include <asm-generic/errno-base.h>
 #include <unistd.h>
 #include <sys/socket.h>
-#include "src/server/include/selector.h"
-#include "args.h"
-#include "src/server/include/user.h"
+#include "include/selector.h"
+#include "include/args.h"
+#include "include/user.h"
 #include <netinet/in.h>
 #include <poll.h>
 #include <arpa/inet.h>
-#include "user.h"
+#include "include/user.h"
 
 #define SELECTOR_SIZE 1024
 
