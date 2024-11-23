@@ -17,13 +17,13 @@ struct user {
 };
 
 
-bool user_authenticate(const char *username);
+bool set_maildir();
 bool check_password(const char *username, const char *pass);
 bool check_login(const char* username, const char* pass);
 bool check_user(const char *username);
 bool check_user_locked(const char *username, const char *maildir);
 bool lock_user(const char *username, const char *maildir);
 bool unlock_user(const char *username, const char *maildir);
-struct Client* create_user(int socket, char *buf);
+bool add_user(char* username, char* pass);
 
-#endif 
+#endif

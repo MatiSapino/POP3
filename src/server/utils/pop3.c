@@ -282,7 +282,7 @@ static const fd_handler clientHandler = {
 };
 
 void pop3Read(struct selector_key * selector_key) {
-    struct state_machine * stm = &((struct Client *) key->data)->stm;
+    struct state_machine * stm = &((struct Client *) selector_key->data)->stm;
     const enum pop3_state state = stm_handler_read(stm, selector_key);
     if (state == STATE_CLOSE) {
         closeConnection(selector_key);
@@ -290,7 +290,7 @@ void pop3Read(struct selector_key * selector_key) {
 }
 
 void pop3Write(struct selector_key * selector_key) {
-    struct state_machine * stm = &((struct Client *) key->data)->stm;
+    struct state_machine * stm = &((struct Client *) selector_key->data)->stm;
     const enum pop3_state state = stm_handler_write(stm, selector_key);
     if (state == STATE_ERROR || state == STATE_CLOSE) {
         closeConnection(selector_key);
@@ -298,7 +298,7 @@ void pop3Write(struct selector_key * selector_key) {
 }
 
 void pop3Block(struct selector_key * selector_key) {
-    struct state_machine * stm = &((struct Client *) key->data)->stm;
+    struct state_machine * stm = &((struct Client *) selector_key->data)->stm;
     const enum pop3_state state = stm_handler_block(stm, selector_key);
     if (state == STATE_ERROR || state == STATE_CLOSE) {
         closeConnection(selector_key);
@@ -306,7 +306,7 @@ void pop3Block(struct selector_key * selector_key) {
 }
 
 void pop3Close(struct selector_key * selector_key) {
-    struct state_machine * stm = &((struct Client *) key->data)->stm;
+    struct state_machine * stm = &((struct Client *) selector_key->data)->stm;
     stm_handler_close(stm, selector_key);
 }
 

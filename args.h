@@ -2,8 +2,7 @@
 #define ARGS_H_kFlmYm1tW9p5npzDr2opQJ9jM8
 
 #include <stdbool.h>
-
-#define MAX_USERS 10
+#include "user.h"
 
 struct pop3_args {
     char * pop3_addr;

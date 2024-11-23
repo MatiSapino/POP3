@@ -82,6 +82,5 @@ enum commandState valid_command(buffer * inputBuffer, struct commandParse * comm
   if (buffer_can_read(inputBuffer)) {
     state = parse_command(commandParse, buffer_read(inputBuffer));
   }
-
   return state;
 }

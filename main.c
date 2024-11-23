@@ -14,6 +14,7 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <arpa/inet.h>
+#include "user.h"
 
 #define SELECTOR_SIZE 1024
 
@@ -35,6 +36,11 @@ int main(const int argc, char **argv) {
 
     close(STDIN_FILENO);
 
+    if(!set_maildir()){
+        fprintf(stderr, "Couldn't create maildir");
+        goto finally;
+    }
+    
     int ret = -1;
 
     const struct selector_init init = {

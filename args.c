@@ -4,7 +4,6 @@
 #include <string.h>    /* memset */
 #include <errno.h>
 #include <getopt.h>
-
 #include "args.h"
 
 struct pop3_args pop3_args;
@@ -74,6 +73,7 @@ static void usage(const char *progname) {
 
 void parse_args(const int argc, char **argv, struct pop3_args *args) {
     memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
+    struct users * usr;
 
     args->pop3_addr = "0.0.0.0";
     args->pop3_port = 1080;
@@ -107,15 +107,18 @@ void parse_args(const int argc, char **argv, struct pop3_args *args) {
             // case 'P':
             //     args->mng_port   = port(optarg);
             //     break;
-            // case 'u':
-            //     if(nusers >= MAX_USERS) {
-            //         fprintf(stderr, "maximun number of command line users reached: %d.\n", MAX_USERS);
-            //         exit(1);
-            //     } else {
-            //         user(optarg, args->users + nusers);
-            //         nusers++;
-            //     }
-            //     break;
+            case 'u':
+                user(optarg,usr);
+                add_user(usr->name,usr->pass);
+                // if(nusers >= MAX_USERS) {
+                //     fprintf(stderr, "maximun number of command line users reached: %d.\n", MAX_USERS);
+                //     exit(1);
+                // } else {
+                //     user(optarg, args->users + nusers);
+                //     nusers++;
+                // }
+
+                break;
             // case 'v':
             //     version();
             //     exit(0);

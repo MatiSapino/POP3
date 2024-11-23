@@ -43,7 +43,7 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
 static enum pop3_state executeUser(struct selector_key * selector_key, struct command * command){
     struct Client * client = selector_key->data;
     if(command->args1 == NULL){
-        errResonse(client, "Invalid argument");
+        errResponse(client, "Invalid argument");
         return STATE_WRITE;
     }
 
@@ -54,19 +54,16 @@ static enum pop3_state executeUser(struct selector_key * selector_key, struct co
 
 static enum pop3_state executePass(struct selector_key * key, struct command * command){
     struct Client * client = key->data;
-    
     if (command->args1 == NULL) {
         errResponse(client, "Invalid arguments");
         return STATE_WRITE;
     }
-
     if(check_login(client->user->username, (char*)command->args1)){
         strcpy(client->user->password, (char*)command->args1);
         return STATE_WRITE;
     } else {
         errResponse(client, "Invalid credentials");
     }
-    
     return STATE_WRITE;   
 }
 
