@@ -355,7 +355,8 @@ void passiveAccept(struct selector_key * key) {
         OP_WRITE,
         client
     );
-    if (selectorStatus != SELECTOR_SUCCESS) {
+    
+    if (selectorStatus != SELECTOR_SUCCESS){
         goto handle_error;
     }
 
