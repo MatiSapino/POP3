@@ -32,14 +32,15 @@ static void sigterm_handler(const int signal) {
 }
 
 int main(const int argc, char **argv) {
-    parse_args(argc, argv, &pop3_args);
-
-    close(STDIN_FILENO);
-
     if(!set_maildir()){
         fprintf(stderr, "Couldn't create maildir");
         goto finally;
     }
+    
+    parse_args(argc, argv, &pop3_args);
+
+    close(STDIN_FILENO);
+
     
     int ret = -1;
 

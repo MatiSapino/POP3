@@ -19,14 +19,19 @@ bool set_maildir() {
         return false;
     }
     snprintf(full_path, sizeof(full_path), "%s/maildir", home);
-
+    
     if (mkdir(full_path, 0755) != 0) {
         if (errno == EEXIST) {
+            strncpy(maildir, full_path, sizeof(maildir) - 1);
+            maildir[sizeof(maildir) - 1] = '\0';
             return true;
         } else {
             return false;
         }
     }
+    strncpy(maildir, full_path, sizeof(maildir) - 1);
+    maildir[sizeof(maildir) - 1] = '\0';
+    fprintf(stderr, "Maildir created at %s\n", maildir);
     return true;
 }
 //si existe el usuario
@@ -83,12 +88,13 @@ bool add_user(char* username, char* pass){
     if(userCount>=MAX_USERS){
         return false;
     }
-    fprintf(stderr, "Creating user dir\n");
     size_t len = strlen(maildir) + strlen(username) + 2;
 
     char path[len]; 
     snprintf(path, sizeof(path), "%s/%s", maildir, username);
+    fprintf(stderr, "Creating user dir at: %s\n", path);
     if (mkdir(path, 0755) != 0) {
+        fprintf(stderr, "Couldn't create user dir\n");
         return false;
     }
 
