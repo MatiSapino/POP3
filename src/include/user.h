@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <limits.h>  // Para PATH_MAX
+#include <limits.h>
 #include "pop3.h"
 #include "stm.h"
 
@@ -12,7 +12,6 @@
 #define MAX_PASSWORD 40
 #define MAX_USERS 1024
 #define MAX_MAILS 1000
-#define PATH_MAX 1024
 
 struct user {
     char username[MAX_USERNAME];

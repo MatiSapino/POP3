@@ -3,6 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+#include <errno.h>
 #include "../include/transform.h"
 #include "../include/user.h"
 
@@ -10,6 +12,19 @@ static struct transform_manager manager;
 
 void transform_init(void) {
     memset(&manager, 0, sizeof(manager));
+    
+    // Agregar transformación por defecto (cat)
+    transform_add("cat", "cat");
+    
+    // Si spamassassin está instalado, lo agregamos
+    if (system("which spamassassin > /dev/null 2>&1") == 0) {
+        transform_add("spamassassin", "spamassassin");
+    }
+    
+    // Si renattach está instalado, lo agregamos
+    if (system("which renattach > /dev/null 2>&1") == 0) {
+        transform_add("renattach", "renattach");
+    }
 }
 
 bool transform_add(const char *name, const char *command) {
@@ -31,42 +46,34 @@ bool transform_add(const char *name, const char *command) {
     return true;
 }
 
-bool transform_set_enabled(const char *name, bool enabled) {
-    for (size_t i = 0; i < manager.transform_count; i++) {
-        if (strcmp(manager.transforms[i].name, name) == 0) {
-            manager.transforms[i].enabled = enabled;
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool apply_single_transform(const char *command, const char *input_file, const char *output_file) {
+static bool apply_single_transform(const char *command, int input_fd, int output_fd) {
     pid_t pid = fork();
     
     if (pid == -1) {
+        fprintf(stderr, "Fork failed: %s\n", strerror(errno));
         return false;
     }
     
     if (pid == 0) { // Child process
-        // Redirigir entrada estándar desde input_file
-        FILE *input = fopen(input_file, "r");
-        if (input == NULL) {
+        // Redirigir entrada estándar
+        if (dup2(input_fd, STDIN_FILENO) == -1) {
+            fprintf(stderr, "Failed to redirect stdin: %s\n", strerror(errno));
             exit(1);
         }
-        dup2(fileno(input), STDIN_FILENO);
-        fclose(input);
         
-        // Redirigir salida estándar hacia output_file
-        FILE *output = fopen(output_file, "w");
-        if (output == NULL) {
+        // Redirigir salida estándar
+        if (dup2(output_fd, STDOUT_FILENO) == -1) {
+            fprintf(stderr, "Failed to redirect stdout: %s\n", strerror(errno));
             exit(1);
         }
-        dup2(fileno(output), STDOUT_FILENO);
-        fclose(output);
+        
+        // Cerrar los file descriptors originales
+        close(input_fd);
+        close(output_fd);
         
         // Ejecutar el comando
         execl("/bin/sh", "sh", "-c", command, NULL);
+        fprintf(stderr, "Exec failed: %s\n", strerror(errno));
         exit(1);
     }
     
@@ -78,36 +85,70 @@ static bool apply_single_transform(const char *command, const char *input_file, 
 }
 
 bool transform_apply(const char *input_file, const char *output_file) {
-    char temp_file[PATH_MAX];
+    int input_fd = open(input_file, O_RDONLY);
+    if (input_fd == -1) {
+        fprintf(stderr, "Cannot open input file: %s\n", strerror(errno));
+        return false;
+    }
+    
+    char temp_path[PATH_MAX];
     const char *current_input = input_file;
+    int current_input_fd = input_fd;
     
     for (size_t i = 0; i < manager.transform_count; i++) {
         if (!manager.transforms[i].enabled) {
             continue;
         }
         
-        // Crear nombre de archivo temporal para esta transformación
-        snprintf(temp_file, sizeof(temp_file), "%s.%zu.tmp", output_file, i);
+        // Crear archivo temporal para esta transformación
+        snprintf(temp_path, sizeof(temp_path), "%s.%zu.tmp", output_file, i);
         
-        // Aplicar la transformación
-        if (!apply_single_transform(manager.transforms[i].command, 
-                                  current_input, 
-                                  i == manager.transform_count - 1 ? output_file : temp_file)) {
+        // Abrir archivo de salida
+        int output_fd = open(temp_path, 
+                           O_WRONLY | O_CREAT | O_TRUNC, 
+                           S_IRUSR | S_IWUSR);
+        
+        if (output_fd == -1) {
+            fprintf(stderr, "Cannot open output file: %s\n", strerror(errno));
+            close(current_input_fd);
             return false;
         }
         
-        // Si no es la última transformación, el output se convierte en el próximo input
-        if (i < manager.transform_count - 1) {
-            current_input = temp_file;
+        // Aplicar la transformación
+        bool success = apply_single_transform(manager.transforms[i].command, 
+                                           current_input_fd, 
+                                           output_fd);
+        
+        close(output_fd);
+        
+        if (current_input_fd != input_fd) {
+            close(current_input_fd);
+            unlink(current_input);  // Eliminar archivo temporal anterior
+        }
+        
+        if (!success) {
+            fprintf(stderr, "Transform failed: %s\n", manager.transforms[i].name);
+            unlink(temp_path);
+            return false;
+        }
+        
+        // Preparar para la siguiente iteración
+        current_input = temp_path;
+        current_input_fd = open(current_input, O_RDONLY);
+        if (current_input_fd == -1) {
+            fprintf(stderr, "Cannot open intermediate file: %s\n", strerror(errno));
+            return false;
         }
     }
     
-    // Limpiar archivos temporales
-    for (size_t i = 0; i < manager.transform_count - 1; i++) {
-        snprintf(temp_file, sizeof(temp_file), "%s.%zu.tmp", output_file, i);
-        unlink(temp_file);
+    // Mover el último archivo temporal al archivo de salida final
+    if (rename(current_input, output_file) == -1) {
+        fprintf(stderr, "Cannot rename final file: %s\n", strerror(errno));
+        close(current_input_fd);
+        return false;
     }
     
+    close(current_input_fd);
     return true;
 }
 
