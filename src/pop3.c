@@ -78,12 +78,15 @@ static enum pop3_state parseInput(struct selector_key * selector_key, struct Cli
         enum commandState commandState = valid_command(&client->inputBuffer, client->commandParse);
 
         if (commandState == CMD_OK) {
+            fprintf(stderr, "Command is OK\n");
             state = executeCommand(selector_key, client->commandParse->command);
             reset_commandParser(client->commandParse);
             return state;
         }
 
         if (commandState == CMD_INVALID) {
+            fprintf(stderr, "Command is invalid\n");
+
             errResponse(client, "Invalid command");
             return STATE_WRITE;
         }
@@ -108,11 +111,14 @@ static unsigned readCommand(struct selector_key * selector_key) {
     uint8_t * buffer;
     selector_status status;
     enum pop3_state states;
-
+   
     buffer = buffer_write_ptr(&client->inputBuffer, &limit);
     count = recv(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
-
+   
+    fprintf(stderr, "buffer copiado\n");
+   
     if (count <= 0 && limit != 0) {
+        fprintf(stderr, "me voy a handle error\n");
         goto handle_error;
     }
 
@@ -125,7 +131,7 @@ static unsigned readCommand(struct selector_key * selector_key) {
                 goto handle_error;
             }
             return STATE_WRITE;
-        case STATE_READ:
+        case STATE_ERROR:
             goto handle_error;
         default:
             return states;

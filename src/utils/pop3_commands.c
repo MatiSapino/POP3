@@ -24,6 +24,7 @@ static struct command_function commands[] = {
 };
 
 enum pop3_state executeCommand(struct selector_key * selector_key, struct command * command) {
+    fprintf(stderr, "Executing command\n");
     struct Client * client = selector_key->data;
     struct command_function * commandFunction;
     int i;
@@ -78,13 +79,16 @@ static enum pop3_state executeUser(struct selector_key * selector_key, struct co
 }
 
 static enum pop3_state executePass(struct selector_key * key, struct command * command){
+    fprintf(stderr, "Executing PASS\n");
     struct Client * client = key->data;
     if (command->args1 == NULL) {
         errResponse(client, "Invalid arguments");
         return STATE_WRITE;
     }
+
     if(check_login(client->user->username, (char*)command->args1)){
         strcpy(client->user->password, (char*)command->args1);
+        okResponse(client, "Password accepted");
         return STATE_WRITE;
     } else {
         errResponse(client, "Invalid credentials");
