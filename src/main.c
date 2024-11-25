@@ -14,7 +14,7 @@
 #include <netinet/in.h>
 #include <poll.h>
 #include <arpa/inet.h>
-#include "include/user.h"
+#include "include/metrics.h"
 
 #define SELECTOR_SIZE 1024
 
@@ -41,7 +41,8 @@ int main(const int argc, char **argv) {
 
     close(STDIN_FILENO);
 
-    
+    metrics_init();
+
     int ret = -1;
 
     const struct selector_init init = {
