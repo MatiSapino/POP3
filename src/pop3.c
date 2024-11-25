@@ -357,7 +357,7 @@ void passiveAccept(struct selector_key * key) {
     client->stm.states = client_states;
     client->user = malloc(sizeof(struct user));
     client->commandParse = commandParseInit();
-
+    client->authenticated = false;
     stm_init(&client->stm);
 
     if (selector_fd_set_nio(clientSocket) == -1) {

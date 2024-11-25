@@ -58,7 +58,11 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
 
 static enum pop3_state executeUser(struct selector_key * selector_key, struct command * command){
     struct Client * client = selector_key->data;
-    
+    if(client->authenticated){
+        errResponse(client, "Already authenticated");
+        return STATE_ERROR;
+    }
+
     if(client->user == NULL){
         fprintf(stderr, "Client->user is NULL\n");
         errResponse(client, "Internal server error");
@@ -66,15 +70,12 @@ static enum pop3_state executeUser(struct selector_key * selector_key, struct co
     }
 
     if(command->args1 == NULL){
-        errResponse(client, "Invalid argument");
         return STATE_WRITE;
     }
-
-    strncpy(client->user->username, (char *)command->args1, MAX_USERNAME-1);
-    client->user->username[MAX_USERNAME - 1] = '\0';
-    fprintf(stderr, "state: %d\n", client->stm.current->state);
-    okResponse(client, "User accepted");
-    fprintf(stderr, "executeUser done\n");
+    if(check_user((char *)command->args1, client)){
+        strncpy(client->user->username, (char *)command->args1, MAX_USERNAME-1);
+        client->user->username[MAX_USERNAME - 1] = '\0';
+    }
     return STATE_WRITE;
 }
 
@@ -86,13 +87,10 @@ static enum pop3_state executePass(struct selector_key * key, struct command * c
         return STATE_WRITE;
     }
 
-    if(check_login(client->user->username, (char*)command->args1)){
+    if(check_password(client->user->username, (char*)command->args1, client)){
         strcpy(client->user->password, (char*)command->args1);
-        okResponse(client, "Password accepted");
-        return STATE_WRITE;
-    } else {
-        errResponse(client, "Invalid credentials");
-    }
+        okResponse(client, "maildrop locked and ready");
+    }     
     return STATE_WRITE;   
 }
 

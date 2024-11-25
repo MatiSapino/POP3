@@ -36,7 +36,7 @@ typedef struct Client {
     struct buffer outputBuffer;
     uint8_t outputBufferData[BUFFER_SIZE];
     struct state_machine stm;
-
+    bool authenticated;
     struct commandParse * commandParse;
 
     struct user * user;
