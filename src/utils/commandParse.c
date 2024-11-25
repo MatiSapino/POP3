@@ -5,9 +5,19 @@
 
 struct commandParse * commandParseInit() {
   struct commandParse * commandParse = malloc(sizeof(struct commandParse));
+  if (commandParse == NULL) {
+    return NULL;
+  }
+  
   commandParse->state = commandParse->prevState = CMD_DISPATCHER;
   commandParse->bytes = 0;
   commandParse->command = malloc(sizeof(struct command));
+  if (commandParse->command == NULL) {
+    free(commandParse);
+    return NULL;
+  }
+  
+  memset(commandParse->command->data, 0, CMD_MAX_LENGHT);
   commandParse->command->args1 = NULL;
   commandParse->command->args2 = NULL;
 
@@ -48,8 +58,9 @@ static enum commandState parse_command(struct commandParse * commandParse, uint8
     fprintf(stderr, "In CMD_ARGS state, prev_state: %d\n", commandParse->prevState);
     if (c != ' ' && c != '\t' && c != '\r' && commandParse->prevState == CMD_DISPATCHER) {
       if (commandParse->command->args1 == NULL) {
-        commandParse->command->args1 = &(commandParse->command->data[commandParse->bytes - 1]);
-        fprintf(stderr, "Setting args1 to position: %d\n", commandParse->bytes - 1);
+        commandParse->command->args1 = commandParse->command->data + (commandParse->bytes - 1);
+        fprintf(stderr, "Setting args1 to offset: %ld\n", 
+                (long)(commandParse->command->args1 - commandParse->command->data));
       } else {
         commandParse->command->args2 = &(commandParse->command->data[commandParse->bytes - 1]);
         fprintf(stderr, "Setting args2 to position: %d\n", commandParse->bytes - 1);
