@@ -132,6 +132,7 @@ bool add_user(char* username, char* pass){
 struct mailbox * get_user_mailbox(const char *username) {
     struct mailbox *box = malloc(sizeof(struct mailbox));
     if (box == NULL) {
+        fprintf(stderr, "Error: No se pudo asignar memoria para mailbox\n");
         return NULL;
     }
     
@@ -139,9 +140,11 @@ struct mailbox * get_user_mailbox(const char *username) {
     
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s/new", maildir, username);
+    fprintf(stderr, "Buscando emails en: %s\n", path);
     
     DIR *dir = opendir(path);
     if (!dir) {
+        fprintf(stderr, "Error: No se pudo abrir el directorio %s (errno: %d)\n", path, errno);
         free(box);
         return NULL;
     }
@@ -151,21 +154,33 @@ struct mailbox * get_user_mailbox(const char *username) {
     char filepath[PATH_MAX];
     
     while ((entry = readdir(dir)) != NULL) {
-        if (entry->d_name[0] == '.') continue; // Ignorar archivos ocultos
+        if (entry->d_name[0] == '.') {
+            fprintf(stderr, "Ignorando archivo oculto: %s\n", entry->d_name);
+            continue;
+        }
         
         snprintf(filepath, sizeof(filepath), "%s/%s", path, entry->d_name);
         
         if (stat(filepath, &st) == 0 && S_ISREG(st.st_mode)) {
-            if (box->mail_count >= MAX_MAILS) break;
+            if (box->mail_count >= MAX_MAILS) {
+                fprintf(stderr, "Advertencia: Se alcanzó el límite máximo de emails (%d)\n", MAX_MAILS);
+                break;
+            }
             
             strncpy(box->mails[box->mail_count].filename, entry->d_name, PATH_MAX-1);
+            box->mails[box->mail_count].filename[PATH_MAX-1] = '\0';  // Asegurar terminación null
             box->mails[box->mail_count].size = st.st_size;
             box->mails[box->mail_count].deleted = false;
             
             box->total_size += st.st_size;
             box->mail_count++;
+            
+            fprintf(stderr, "Email encontrado: %s (tamaño: %ld bytes)\n", entry->d_name, st.st_size);
         }
     }
+    
+    fprintf(stderr, "Total emails encontrados: %zu, Tamaño total: %zu bytes\n", 
+            box->mail_count, box->total_size);
     
     closedir(dir);
     return box;
