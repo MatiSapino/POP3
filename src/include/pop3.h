@@ -69,7 +69,7 @@ void passiveAccept(struct selector_key *key);
 
 void okResponse(struct Client * client, const char * message);
 void errResponse(struct Client * client, const char * message);
-
+void response(struct Client * client, const char * message);
 
 
 #endif
