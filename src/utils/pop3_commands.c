@@ -77,6 +77,8 @@ static enum pop3_state executeUser(struct selector_key * selector_key, struct co
     strncpy(client->user->username, (char *)command->args1, MAX_USERNAME);
     client->user->username[MAX_USERNAME - 1] = '\0';
     
+    fprintf(stderr, "Size of user struct: %zu\n", sizeof(struct user));
+    
     okResponse(client, "User accepted");
     return STATE_WRITE;
 }
