@@ -1,6 +1,7 @@
 #include "commandParse.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 struct commandParse * commandParseInit() {
   struct commandParse * commandParse = malloc(sizeof(struct commandParse));
@@ -32,8 +33,31 @@ void free_commandParser(struct commandParse * command_parse) {
 }
 
 static enum commandState parse_command(struct commandParse * commandParse, uint8_t c) {
+  fprintf(stderr, "Parsing char: '%c', bytes: %d, state: %d\n", c, commandParse->bytes, commandParse->state);
+  
+  // Verificar límite de buffer
+  if (commandParse->bytes >= CMD_MAX_LENGHT) {
+    fprintf(stderr, "ERROR: Buffer overflow prevented\n");
+    return CMD_INVALID;
+  }
+
   commandParse->command->data[commandParse->bytes] = c;
   commandParse->bytes++;
+
+  if (commandParse->state == CMD_ARGS) {
+    fprintf(stderr, "In CMD_ARGS state, prev_state: %d\n", commandParse->prevState);
+    if (c != ' ' && c != '\t' && c != '\r' && commandParse->prevState == CMD_DISPATCHER) {
+      if (commandParse->command->args1 == NULL) {
+        commandParse->command->args1 = &(commandParse->command->data[commandParse->bytes - 1]);
+        fprintf(stderr, "Setting args1 to position: %d\n", commandParse->bytes - 1);
+      } else {
+        commandParse->command->args2 = &(commandParse->command->data[commandParse->bytes - 1]);
+        fprintf(stderr, "Setting args2 to position: %d\n", commandParse->bytes - 1);
+      }
+      commandParse->prevState = CMD_ARGS;
+    }
+  }
+
   if (commandParse->state == CMD_DISPATCHER) {
     if (c == ' ') {
       commandParse->prevState = commandParse->state;
