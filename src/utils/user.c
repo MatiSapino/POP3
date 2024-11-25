@@ -17,22 +17,30 @@ bool set_maildir() {
 
     char* home = getenv("HOME");
     if (home == NULL) {
+        fprintf(stderr, "DEBUG: No se pudo obtener HOME\n");
         return false;
     }
+    
+    fprintf(stderr, "DEBUG: HOME path: %s\n", home);
     snprintf(full_path, sizeof(full_path), "%s/maildir", home);
+    
+    fprintf(stderr, "DEBUG: Intentando usar maildir: %s\n", full_path);
     
     if (mkdir(full_path, 0755) != 0) {
         if (errno == EEXIST) {
             strncpy(maildir, full_path, sizeof(maildir) - 1);
             maildir[sizeof(maildir) - 1] = '\0';
+            fprintf(stderr, "DEBUG: Usando maildir existente: %s\n", maildir);
             return true;
         } else {
+            fprintf(stderr, "DEBUG: Error creando maildir: %s (errno: %d)\n", full_path, errno);
             return false;
         }
     }
+    
     strncpy(maildir, full_path, sizeof(maildir) - 1);
     maildir[sizeof(maildir) - 1] = '\0';
-    fprintf(stderr, "Maildir created at %s\n", maildir);
+    fprintf(stderr, "DEBUG: Maildir creado en: %s\n", maildir);
     return true;
 }
 //si existe el usuario
@@ -60,8 +68,12 @@ bool check_password(const char *username, const char *pass, struct Client* Clien
     return false;
 }
 
-bool check_login(const char* username, const char* pass, struct Client* Client){
-    return check_user(username, Client) && check_password(username, pass, Client);
+bool check_login(const char* username, const char* pass, struct Client* Client) {
+    fprintf(stderr, "DEBUG: Intentando login para usuario: %s\n", username);
+    bool user_ok = check_user(username, Client);
+    bool pass_ok = check_password(username, pass, Client);
+    fprintf(stderr, "DEBUG: Resultado login - user_ok: %d, pass_ok: %d\n", user_ok, pass_ok);
+    return user_ok && pass_ok;
 }
 
 

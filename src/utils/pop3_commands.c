@@ -144,13 +144,25 @@ static void listCommands(struct command_function commands[], struct Client* clie
 static enum pop3_state executeSTAT(struct selector_key *key, struct command *command) {
     struct Client *client = key->data;
     
+    fprintf(stderr, "DEBUG: Iniciando comando STAT\n");
+    
     if (!client->authenticated) {
+        fprintf(stderr, "DEBUG: Cliente no autenticado\n");
         errResponse(client, "-ERR not authenticated");
+        return STATE_WRITE;
+    }
+    
+    fprintf(stderr, "DEBUG: Cliente autenticado como: %s\n", client->user->username);
+    
+    if (client->user == NULL) {
+        fprintf(stderr, "DEBUG: Error: client->user es NULL\n");
+        errResponse(client, "-ERR internal error");
         return STATE_WRITE;
     }
     
     struct mailbox *box = get_user_mailbox(client->user->username);
     if (!box) {
+        fprintf(stderr, "DEBUG: Error obteniendo mailbox\n");
         errResponse(client, "-ERR mailbox error");
         return STATE_WRITE;
     }
@@ -159,6 +171,7 @@ static enum pop3_state executeSTAT(struct selector_key *key, struct command *com
     snprintf(response, sizeof(response), "+OK %zu %zu", 
              box->mail_count, box->total_size);
              
+    fprintf(stderr, "DEBUG: Enviando respuesta: %s\n", response);
     okResponse(client, response);
     
     free(box);
