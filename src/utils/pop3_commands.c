@@ -65,7 +65,8 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
     
     fprintf(stderr, "Executing command: %s\n", (char *)command->data);
 
-    commandFunction = commands_anonymous;
+    if(client->authenticated) commandFunction = commands_authenticated;
+    else commandFunction = commands_anonymous;
 
     for (i = 0; commandFunction[i].name != NULL; i++) {
         if (strcasecmp(commandFunction[i].name, (char *)command->data) == 0) {
@@ -148,7 +149,7 @@ static enum pop3_state executeSTAT(struct selector_key *key, struct command *com
     
     if (!client->authenticated) {
         fprintf(stderr, "DEBUG: Cliente no autenticado\n");
-        errResponse(client, "-ERR not authenticated");
+        errResponse(client, "not authenticated");
         return STATE_WRITE;
     }
     
@@ -156,19 +157,19 @@ static enum pop3_state executeSTAT(struct selector_key *key, struct command *com
     
     if (client->user == NULL) {
         fprintf(stderr, "DEBUG: Error: client->user es NULL\n");
-        errResponse(client, "-ERR internal error");
+        errResponse(client, "internal error");
         return STATE_WRITE;
     }
     
     struct mailbox *box = get_user_mailbox(client->user->username);
     if (!box) {
         fprintf(stderr, "DEBUG: Error obteniendo mailbox\n");
-        errResponse(client, "-ERR mailbox error");
+        errResponse(client, "mailbox error");
         return STATE_WRITE;
     }
     
     char response[100];
-    snprintf(response, sizeof(response), "+OK %zu %zu", 
+    snprintf(response, sizeof(response), "%zu %zu", 
              box->mail_count, box->total_size);
              
     fprintf(stderr, "DEBUG: Enviando respuesta: %s\n", response);
