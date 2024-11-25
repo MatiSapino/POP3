@@ -340,6 +340,7 @@ void passiveAccept(struct selector_key * key) {
     client->stm.initial = STATE_WELCOME;
     client->stm.max_state = STATE_ERROR;
     client->stm.states = client_states;
+    client->user = malloc(sizeof(struct user));
     client->commandParse = commandParseInit();
 
     stm_init(&client->stm);

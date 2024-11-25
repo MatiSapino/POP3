@@ -40,7 +40,6 @@ typedef struct Client {
     struct commandParse * commandParse;
 
     struct user * user;
-    char * maildir;
     bool closed;
 } Client;
 

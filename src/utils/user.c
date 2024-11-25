@@ -58,7 +58,15 @@ bool check_password(const char *username, const char *pass) {
 }
 
 bool check_login(const char* username, const char* pass){
-    return check_user(username) && check_password(username, pass);
+    // return check_user(username) && check_password(username, pass);
+     for(int i=0; i<userCount; i++){
+        if(strcmp(users[i].username, username) == 0){
+            if(strcmp(users[i].password,pass)==0){
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 
