@@ -127,9 +127,10 @@ static enum pop3_state executeCAPA(struct selector_key *key, struct command *com
     int commands_count = sizeof(commands_authenticated)/sizeof(commands_authenticated[0]);
     for (size_t i = 0; i < commands_count; i++)
     {
-        okResponse(client, commands_authenticated[i].name);
+        if(commands_authenticated[i].name != NULL)
+            response(client, commands_authenticated[i].name);
     }
-    okResponse(client, ".");
+    response(client, ".");
     return STATE_WRITE;
 }
 

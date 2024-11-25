@@ -1,12 +1,18 @@
-#include "pop3.h"
-
-#include <commandParse.h>
-#include <pop3_commands.h>
+#include "include/pop3.h"
+#include "include/commandParse.h"
+#include "include/pop3_commands.h"
+#include "include/metrics.h"
 
 // allow to work on macOS
 #ifndef MSG_NOSIGNAL
 #define MSG_NOSIGNAL 0x4000
 #endif
+
+ssize_t send_metrics(int fd, const void * buff, size_t n, int flags) {
+  ssize_t count = send(fd, buff, n, flags);
+  metrics_bytes_sent(count);
+  return count;
+}
 
 static unsigned welcomeClient(struct selector_key * selector_key) {
     struct Client * client = selector_key->data;
@@ -17,7 +23,7 @@ static unsigned welcomeClient(struct selector_key * selector_key) {
     selector_status status;
 
     buffer = buffer_read_ptr(&client->outputBuffer, &limit);
-    count = send(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
+    count = send_metrics(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count <= 0) {
         goto handle_error;
@@ -156,7 +162,7 @@ static unsigned writeToClient(struct selector_key * selector_key) {
     enum pop3_state states;
 
     buffer = buffer_read_ptr(&client->outputBuffer, &limit);
-    count = send(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
+    count = send_metrics(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count <= 0 && limit != 0) {
         goto handle_error;
@@ -202,7 +208,7 @@ static unsigned int writeToFile(struct selector_key * selector_key) {
     enum pop3_state states;
 
     buffer = buffer_read_ptr(&client->outputBuffer, &limit);
-    count = send(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
+    count = send_metrics(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count < 0 && limit != 0) {
         goto handle_error;
@@ -280,6 +286,8 @@ static void closeConnection(struct selector_key * key) {
     // TODO: i need to close the email fd
 
     free(client);
+
+    metrics_connection_closed();
 }
 
 static void pop3Read(struct selector_key * selector_key);
@@ -375,6 +383,8 @@ void passiveAccept(struct selector_key * key) {
     if (selectorStatus != SELECTOR_SUCCESS){
         goto handle_error;
     }
+
+    metrics_new_connection();
 
     return;
 
