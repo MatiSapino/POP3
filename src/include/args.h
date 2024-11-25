@@ -7,6 +7,8 @@
 struct pop3_args {
     char * pop3_addr;
     unsigned short pop3_port;
+    char * mng_addr;
+    unsigned short mng_port;
 };
 
 struct users {

@@ -76,8 +76,11 @@ void parse_args(const int argc, char **argv, struct pop3_args *args) {
     memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
     struct users usr = {0};
 
+    // Valores por defecto
     args->pop3_addr = "0.0.0.0";
     args->pop3_port = 1080;
+    args->mng_addr = "127.0.0.1";  // Solo acceso local por defecto
+    args->mng_port = 9090;         // Puerto por defecto para administración
 
     int c;
 

@@ -2,11 +2,17 @@
 #define METRICS_H
 
 #include <stddef.h>
+#include <time.h>
 
 struct metrics {
   size_t currentConnections;
   size_t totalConnections;
   size_t bytesSent;
+  size_t bytesReceived;
+  size_t totalCommands;
+  size_t failedCommands;
+  time_t serverStartTime;
+  size_t activeUsers;
 };
 
 void metrics_init();

@@ -5,7 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <asm-generic/errno-base.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include "include/selector.h"
@@ -15,6 +14,7 @@
 #include <poll.h>
 #include <arpa/inet.h>
 #include "include/metrics.h"
+#include "include/admin.h"
 
 #define SELECTOR_SIZE 1024
 
@@ -66,6 +66,8 @@ int main(const int argc, char **argv) {
     if (serverSocket == -1) {
         goto finally;
     }
+
+    admin_init(pop3_args.mng_addr, pop3_args.mng_port);
 
     signal(SIGTERM, sigterm_handler);
     signal(SIGINT,  sigterm_handler);

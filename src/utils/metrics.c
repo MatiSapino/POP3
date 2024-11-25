@@ -28,12 +28,19 @@ void metrics_get_metrics(struct metrics * metricsCopy) {
 
 void log_command(const char *username, const char *command, const char *response) {
     time_t now;
+    struct tm *tm_info;
+    char timestamp[26];
+    
     time(&now);
+    tm_info = localtime(&now);
+    strftime(timestamp, 26, "%Y-%m-%d %H:%M:%S", tm_info);
     
     FILE *log = fopen("pop3_access.log", "a");
     if (log != NULL) {
         fprintf(log, "[%s] User: %s, Command: %s, Response: %s\n", 
-                ctime(&now), username, command, response);
+                timestamp, username ? username : "anonymous", 
+                command ? command : "unknown", 
+                response ? response : "no response");
         fclose(log);
     }
 }
