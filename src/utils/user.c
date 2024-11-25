@@ -36,17 +36,19 @@ bool set_maildir() {
     return true;
 }
 //si existe el usuario
-bool check_user(const char *username) {
+bool check_user(const char *username, struct Client* Client) {
     for(int i=0; i<userCount; i++){
         if(strcmp(users[i].username, username) == 0){
+            okResponse(Client, "user accepted");
             return true;
         }
     }
+    errResponse(Client, "invalid user");
     return false;
 }
 
 //chequeo de la contraseña
-bool check_password(const char *username, const char *pass) {
+bool check_password(const char *username, const char *pass, struct Client* Client) {
     for(int i=0; i<userCount; i++){
         if(strcmp(users[i].username, username) == 0){
             if(strcmp(users[i].password,pass)==0){
@@ -54,19 +56,12 @@ bool check_password(const char *username, const char *pass) {
             }
         }
     }
+    errResponse(Client, "invalid password");
     return false;
 }
 
-bool check_login(const char* username, const char* pass){
-    // return check_user(username) && check_password(username, pass);
-     for(int i=0; i<userCount; i++){
-        if(strcmp(users[i].username, username) == 0){
-            if(strcmp(users[i].password,pass)==0){
-                return true;
-            }
-        }
-    }
-    return false;
+bool check_login(const char* username, const char* pass, struct Client* Client){
+    return check_user(username, Client) && check_password(username, pass, Client);
 }
 
 
