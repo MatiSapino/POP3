@@ -101,12 +101,27 @@ bool add_user(char* username, char* pass){
         return false;
     }
 
+    // Create cur, new and tmp directories
+    char cur_path[len + 5];
+    char new_path[len + 5]; 
+    char tmp_path[len + 5];
+
+    snprintf(cur_path, sizeof(cur_path), "%s/cur", path);
+    snprintf(new_path, sizeof(new_path), "%s/new", path);
+    snprintf(tmp_path, sizeof(tmp_path), "%s/tmp", path);
+
+    if (mkdir(cur_path, 0755) != 0 || 
+        mkdir(new_path, 0755) != 0 ||
+        mkdir(tmp_path, 0755) != 0) {
+        fprintf(stderr, "Couldn't create maildir subdirectories\n");
+        return false;
+    }
+
     for(int i = 0; i < userCount;i++){
         if(strcmp(users[i].username, username)==0){
             return false; 
         }
     }
-    fprintf(stderr, "\n \n");
 
     strncpy(users[userCount].username, username,MAX_USERNAME);
     strncpy(users[userCount].password, pass,MAX_PASSWORD);
