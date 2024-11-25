@@ -134,18 +134,33 @@ static enum pop3_state executeCAPA(struct selector_key *key, struct command *com
     return STATE_WRITE;
 }
 
-static void listCommands(struct command_function *commands, struct Client *client){
-    int commands_count = sizeof(*commands)/sizeof(commands[0]);
-    for (size_t i = 0; i < commands_count; i++)
-    {
-        if(commands[i].name != NULL)
-            response(client, commands[i].name);
+static void listCommands(struct command_function *commands, struct Client *client) {
+    for (int i = 0; commands[i].name != NULL; i++) {
+        response(client, commands[i].name);
     }
 }
 
-static enum pop3_state executeSTAT(struct selector_key *key, struct command *command){
-    struct Client * client = key->data;
-    fprintf(stderr, "Executing STAT\n");
+static enum pop3_state executeSTAT(struct selector_key *key, struct command *command) {
+    struct Client *client = key->data;
+    
+    if (!client->authenticated) {
+        errResponse(client, "-ERR not authenticated");
+        return STATE_WRITE;
+    }
+    
+    struct mailbox *box = get_user_mailbox(client->user->username);
+    if (!box) {
+        errResponse(client, "-ERR mailbox error");
+        return STATE_WRITE;
+    }
+    
+    char response[100];
+    snprintf(response, sizeof(response), "+OK %zu %zu", 
+             box->mail_count, box->total_size);
+             
+    okResponse(client, response);
+    
+    free(box);
     return STATE_WRITE;
 }
 

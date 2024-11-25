@@ -114,3 +114,45 @@ bool add_user(char* username, char* pass){
     return true;
 }
 
+struct mailbox * get_user_mailbox(const char *username) {
+    struct mailbox *box = malloc(sizeof(struct mailbox));
+    if (box == NULL) {
+        return NULL;
+    }
+    
+    memset(box, 0, sizeof(struct mailbox));
+    
+    char path[PATH_MAX];
+    snprintf(path, sizeof(path), "%s/%s/new", maildir, username);
+    
+    DIR *dir = opendir(path);
+    if (!dir) {
+        free(box);
+        return NULL;
+    }
+
+    struct dirent *entry;
+    struct stat st;
+    char filepath[PATH_MAX];
+    
+    while ((entry = readdir(dir)) != NULL) {
+        if (entry->d_name[0] == '.') continue; // Ignorar archivos ocultos
+        
+        snprintf(filepath, sizeof(filepath), "%s/%s", path, entry->d_name);
+        
+        if (stat(filepath, &st) == 0 && S_ISREG(st.st_mode)) {
+            if (box->mail_count >= MAX_MAILS) break;
+            
+            strncpy(box->mails[box->mail_count].filename, entry->d_name, PATH_MAX-1);
+            box->mails[box->mail_count].size = st.st_size;
+            box->mails[box->mail_count].deleted = false;
+            
+            box->total_size += st.st_size;
+            box->mail_count++;
+        }
+    }
+    
+    closedir(dir);
+    return box;
+}
+
