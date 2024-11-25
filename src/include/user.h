@@ -31,10 +31,12 @@ struct mailbox {
     size_t total_size;
 };
 
+struct Client;
+
 bool set_maildir();
-bool check_password(const char *username, const char *pass, struct Client* Client);
-bool check_login(const char* username, const char* pass, struct Client* Client);
-bool check_user(const char *username, struct Client* Client);
+bool check_password(const char *username, const char *pass, struct Client* client);
+bool check_login(const char* username, const char* pass, struct Client* client);
+bool check_user(const char *username, struct Client* client);
 bool check_user_locked(const char *username, const char *maildir);
 bool lock_user(const char *username, const char *maildir);
 bool unlock_user(const char *username, const char *maildir);

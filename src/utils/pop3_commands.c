@@ -211,9 +211,83 @@ static enum pop3_state executeSTAT(struct selector_key *key, struct command *com
     return STATE_WRITE;
 }
 
-static enum pop3_state executeLIST(struct selector_key *key, struct command *command){
-    struct Client * client = key->data;
-    fprintf(stderr, "Executing LIST\n");
+static enum pop3_state executeLIST(struct selector_key *key, struct command *command) {
+    struct Client *client = key->data;
+    
+    fprintf(stderr, "DEBUG: Executing LIST command\n");
+
+    // Verificar autenticación
+    if (!client->authenticated) {
+        fprintf(stderr, "DEBUG: Client not authenticated\n");
+        errResponse(client, "not authenticated");
+        return STATE_WRITE;
+    }
+    
+    // Obtener el mailbox del usuario
+    struct mailbox *box = get_user_mailbox(client->user->username);
+    if (!box) {
+        fprintf(stderr, "DEBUG: Mailbox error for user: %s\n", client->user->username);
+        errResponse(client, "mailbox error");
+        return STATE_WRITE;
+    }
+
+    // Si se proporciona un número de mensaje específico
+    if (command->args1 != NULL) {
+        char *endptr;
+        long msg_num = strtol((char *)command->args1, &endptr, 10);
+        
+        if (*endptr != '\0' || msg_num <= 0 || msg_num > box->mail_count) {
+            fprintf(stderr, "DEBUG: Invalid message number: %s\n", (char *)command->args1);
+            errResponse(client, "no such message");
+            free(box);
+            return STATE_WRITE;
+        }
+
+        struct mail *mail = &box->mails[msg_num - 1];
+        if (mail->deleted) {
+            errResponse(client, "message is deleted");
+            free(box);
+            return STATE_WRITE;
+        }
+
+        char response[64];
+        snprintf(response, sizeof(response), "%ld %zu", msg_num, mail->size);
+        okResponse(client, response);
+    } 
+    // Listar todos los mensajes
+    else {
+        char res[64];
+        size_t valid_messages = 0;
+        size_t total_size = 0;
+
+        // Contar mensajes válidos y tamaño total
+        for (size_t i = 0; i < box->mail_count; i++) {
+            if (!box->mails[i].deleted) {
+                valid_messages++;
+                total_size += box->mails[i].size;
+            }
+        }
+
+        snprintf(res, sizeof(res), "%zu messages (%zu octets)", 
+                valid_messages, total_size);
+        okResponse(client, res);
+
+        // Listar cada mensaje no eliminado
+        for (size_t i = 0; i < box->mail_count; i++) {
+            if (!box->mails[i].deleted) {
+                snprintf(res, sizeof(res), "%zu %zu", 
+                        i + 1, box->mails[i].size);
+                response(client, res);
+            }
+        }
+        response(client, ".");
+    }
+
+    // Registrar el comando en el log
+    log_command(client->user->username, "LIST", 
+                command->args1 ? (char *)command->args1 : "all messages");
+
+    free(box);
     return STATE_WRITE;
 }
 
@@ -411,9 +485,24 @@ static enum pop3_state executeDELE(struct selector_key *key, struct command *com
     return STATE_WRITE;
 }
 
-static enum pop3_state executeNOOP(struct selector_key *key, struct command *command){
-    struct Client * client = key->data;
-    fprintf(stderr, "Executing NOOP\n");
+static enum pop3_state executeNOOP(struct selector_key *key, struct command *command) {
+    struct Client *client = key->data;
+    
+    fprintf(stderr, "DEBUG: Executing NOOP command\n");
+
+    // Verificar autenticación
+    if (!client->authenticated) {
+        fprintf(stderr, "DEBUG: Client not authenticated\n");
+        errResponse(client, "not authenticated");
+        return STATE_WRITE;
+    }
+    
+    // Registrar el comando en el log
+    log_command(client->user->username, "NOOP", "OK");
+    
+    // Enviar respuesta exitosa
+    okResponse(client, "done");
+    
     return STATE_WRITE;
 }
 
@@ -450,9 +539,9 @@ static enum pop3_state executeRSET(struct selector_key *key, struct command *com
     }
     
     // Registrar la acción en el log
-    char response[64];
-    snprintf(response, sizeof(response), "%zu messages restored", restored_count);
-    log_command(client->user->username, "RSET", response);
+    char res[64];
+    snprintf(res, sizeof(res), "%zu messages restored", restored_count);
+    log_command(client->user->username, "RSET", res);
     
     // Enviar respuesta exitosa
     okResponse(client, "maildrop has been reset");

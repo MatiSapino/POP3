@@ -44,19 +44,19 @@ bool set_maildir() {
     return true;
 }
 //si existe el usuario
-bool check_user(const char *username, struct Client* Client) {
+bool check_user(const char *username, struct Client* client) {
     for(int i=0; i<userCount; i++){
         if(strcmp(users[i].username, username) == 0){
-            okResponse(Client, "user accepted");
+            okResponse(client, "user accepted");
             return true;
         }
     }
-    errResponse(Client, "invalid user");
+    errResponse(client, "invalid user");
     return false;
 }
 
 //chequeo de la contraseña
-bool check_password(const char *username, const char *pass, struct Client* Client) {
+bool check_password(const char *username, const char *pass, struct Client* client) {
     for(int i=0; i<userCount; i++){
         if(strcmp(users[i].username, username) == 0){
             if(strcmp(users[i].password,pass)==0){
@@ -64,14 +64,14 @@ bool check_password(const char *username, const char *pass, struct Client* Clien
             }
         }
     }
-    errResponse(Client, "invalid password");
+    errResponse(client, "invalid password");
     return false;
 }
 
-bool check_login(const char* username, const char* pass, struct Client* Client) {
+bool check_login(const char* username, const char* pass, struct Client* client) {
     fprintf(stderr, "DEBUG: Intentando login para usuario: %s\n", username);
-    bool user_ok = check_user(username, Client);
-    bool pass_ok = check_password(username, pass, Client);
+    bool user_ok = check_user(username, client);
+    bool pass_ok = check_password(username, pass, client);
     fprintf(stderr, "DEBUG: Resultado login - user_ok: %d, pass_ok: %d\n", user_ok, pass_ok);
     return user_ok && pass_ok;
 }
@@ -187,7 +187,7 @@ struct mailbox * get_user_mailbox(const char *username) {
             box->total_size += st.st_size;
             box->mail_count++;
             
-            fprintf(stderr, "Email encontrado: %s (tamaño: %ld bytes)\n", entry->d_name, st.st_size);
+            fprintf(stderr, "Email encontrado: %s (tamaño: %lld bytes)\n", entry->d_name, st.st_size);
         }
     }
     
