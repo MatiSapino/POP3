@@ -14,5 +14,6 @@ void metrics_new_connection();
 void metrics_connection_closed();
 void metrics_bytes_sent(size_t bytes);
 void metrics_get_metrics(struct metrics * metrics);
+void log_command(const char *username, const char *command, const char *response);
 
 #endif //METRICS_H
