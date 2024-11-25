@@ -57,7 +57,6 @@ void okResponse(struct Client * client, const char * message) {
     char * buffer = (char *)buffer_write_ptr(&client->outputBuffer, &limit);
     
     ssize_t count = snprintf(buffer, limit, "+OK %s\r\n", message);
-    
     buffer_write_adv(&client->outputBuffer, count);
     fprintf(stderr, "okResponse written to buffer\n");
 }
@@ -244,7 +243,7 @@ static const struct state_definition client_states[] = {
     },
     {
         .state = STATE_WRITE,
-        .on_read_ready = writeToClient,
+        .on_write_ready = writeToClient,
     },
     {
         .state = STATE_FILE_WRITE,

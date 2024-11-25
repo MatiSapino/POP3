@@ -55,26 +55,27 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
 }
 
 
-    static enum pop3_state executeUser(struct selector_key * selector_key, struct command * command){
-        struct Client * client = selector_key->data;
-        
-        if(client->user == NULL){
-            fprintf(stderr, "Client->user is NULL\n");
-            errResponse(client, "Internal server error");
-            return STATE_WRITE;
-        }
-
-        if(command->args1 == NULL){
-            errResponse(client, "Invalid argument");
-            return STATE_WRITE;
-        }
-
-        strncpy(client->user->username, (char *)command->args1, MAX_USERNAME-1);
-        client->user->username[MAX_USERNAME - 1] = '\0';
-        okResponse(client, "User accepted");
-        fprintf(stderr, "User accepted\n");
+static enum pop3_state executeUser(struct selector_key * selector_key, struct command * command){
+    struct Client * client = selector_key->data;
+    
+    if(client->user == NULL){
+        fprintf(stderr, "Client->user is NULL\n");
+        errResponse(client, "Internal server error");
         return STATE_WRITE;
     }
+
+    if(command->args1 == NULL){
+        errResponse(client, "Invalid argument");
+        return STATE_WRITE;
+    }
+
+    strncpy(client->user->username, (char *)command->args1, MAX_USERNAME-1);
+    client->user->username[MAX_USERNAME - 1] = '\0';
+    fprintf(stderr, "state: %d\n", client->stm.current->state);
+    okResponse(client, "User accepted");
+    fprintf(stderr, "executeUser done\n");
+    return STATE_WRITE;
+}
 
 static enum pop3_state executePass(struct selector_key * key, struct command * command){
     struct Client * client = key->data;
