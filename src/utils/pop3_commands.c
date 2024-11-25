@@ -119,7 +119,8 @@ static enum pop3_state executePASS(struct selector_key * key, struct command * c
 static enum pop3_state executeQUIT(struct selector_key *key, struct command *command){
     struct Client * client = key->data;
     client->closed = true; 
-    return STATE_WRITE;
+    okResponse(client, "Bye");
+    return STATE_CLOSE;
 }
 
 static enum pop3_state executeCAPA(struct selector_key *key, struct command *command){
