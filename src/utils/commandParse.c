@@ -43,7 +43,6 @@ void free_commandParser(struct commandParse * command_parse) {
 }
 
 static enum commandState parse_command(struct commandParse * commandParse, uint8_t c) {
-  fprintf(stderr, "Parsing char: '%c', bytes: %d, state: %d\n", c, commandParse->bytes, commandParse->state);
   
   // Verificar límite de buffer
   if (commandParse->bytes >= CMD_MAX_LENGHT) {
@@ -55,12 +54,10 @@ static enum commandState parse_command(struct commandParse * commandParse, uint8
   commandParse->bytes++;
 
   if (commandParse->state == CMD_ARGS) {
-    fprintf(stderr, "In CMD_ARGS state, prev_state: %d\n", commandParse->prevState);
     if (c != ' ' && c != '\t' && c != '\r' && commandParse->prevState == CMD_DISPATCHER) {
       if (commandParse->command->args1 == NULL) {
         commandParse->command->args1 = commandParse->command->data + (commandParse->bytes - 1);
-        fprintf(stderr, "Setting args1 to offset: %ld\n", 
-                (long)(commandParse->command->args1 - commandParse->command->data));
+
       } else {
         commandParse->command->args2 = commandParse->command->data + (commandParse->bytes - 1);
         fprintf(stderr, "Setting args2 to position: %d\n", commandParse->bytes - 1);

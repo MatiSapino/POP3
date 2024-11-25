@@ -52,14 +52,16 @@ void errResponse(struct Client * client, const char * message) {
 }
 
 void okResponse(struct Client * client, const char * message) {
+    fprintf(stderr, "Starting okResponse\n");
     size_t limit;
-    uint8_t * buffer;
-    ssize_t count;
-
-    buffer = buffer_read_ptr(&client->outputBuffer, &limit);
-    count = snprintf((char *) buffer, limit, "+OK %s\r\n", message);
+    char * buffer = (char *)buffer_write_ptr(&client->outputBuffer, &limit);
+    
+    ssize_t count = snprintf(buffer, limit, "+OK %s\r\n", message);
+    
     buffer_write_adv(&client->outputBuffer, count);
+    fprintf(stderr, "okResponse written to buffer\n");
 }
+
 
 void response(struct Client * client, const char * message) {
     size_t limit;
@@ -72,10 +74,8 @@ void response(struct Client * client, const char * message) {
 }
 
 static enum pop3_state parseInput(struct selector_key * selector_key, struct Client * client) {
-    fprintf(stderr, "Starting parseInput\n");
     enum pop3_state state;
     while (buffer_can_read(&client->inputBuffer) && buffer_fits(&client->outputBuffer, BUFFER_SPACE)) {
-        fprintf(stderr, "Parsing command...\n");
         enum commandState commandState = valid_command(&client->inputBuffer, client->commandParse);
 
         if (commandState == CMD_OK) {
@@ -94,7 +94,6 @@ static enum pop3_state parseInput(struct selector_key * selector_key, struct Cli
 }
 
 static unsigned readCommand(struct selector_key * selector_key) {
-    fprintf(stderr, "Starting readCommand\n");
     struct Client * client = selector_key->data;
 
     if (client == NULL) {
@@ -112,7 +111,6 @@ static unsigned readCommand(struct selector_key * selector_key) {
     enum pop3_state states;
 
     buffer = buffer_write_ptr(&client->inputBuffer, &limit);
-    fprintf(stderr, "About to recv. Buffer: %p, limit: %zu\n", (void*)buffer, limit);
     count = recv(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count <= 0 && limit != 0) {
@@ -120,9 +118,7 @@ static unsigned readCommand(struct selector_key * selector_key) {
     }
 
     buffer_write_adv(&client->inputBuffer, count);
-
     states = parseInput(selector_key, client);
-
     switch (states) {
         case STATE_WRITE:
             status = selector_set_interest_key(selector_key, OP_WRITE);
@@ -337,10 +333,8 @@ void passiveAccept(struct selector_key * key) {
     if (client == NULL) {
         goto handle_error;
     }
-    fprintf(stderr, "Client allocated at: %p\n", (void*)client);
     
     client->user = malloc(sizeof(struct user));
-    fprintf(stderr, "User allocated at: %p\n", (void*)client->user);
 
     client->addr = clientAddr;
 
