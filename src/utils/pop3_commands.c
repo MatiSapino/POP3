@@ -41,7 +41,11 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
 
 
 static enum pop3_state executeUser(struct selector_key * selector_key, struct command * command){
+    fprintf(stderr, "Executing USER\n");
     struct Client * client = selector_key->data;
+    if(client->user==NULL){
+        fprintf(stderr, "Client is NULL\n");
+    }
     if(command->args1 == NULL){
         errResponse(client, "Invalid argument");
         return STATE_WRITE;

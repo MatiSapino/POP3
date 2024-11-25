@@ -109,9 +109,7 @@ void parse_args(const int argc, char **argv, struct pop3_args *args) {
             //     args->mng_port   = port(optarg);
             //     break;
             case 'u':
-                fprintf(stderr, "printing user->name: ");
                 user(optarg,&usr);
-                fprintf(stderr, "%s:%s\n", usr.name,usr.pass);
                 add_user(usr.name,usr.pass);
                 // if(nusers >= MAX_USERS) {
                 //     exit(1);

@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <dirent.h>
 #include "user.h"
 #include "pop3.h"
 
@@ -84,7 +85,6 @@ bool unlock_user(const char *username, const char *maildir){
 
 
 bool add_user(char* username, char* pass){
-    fprintf(stderr, "Adding user %s\n", username);
     if(userCount>=MAX_USERS){
         return false;
     }
@@ -103,8 +103,11 @@ bool add_user(char* username, char* pass){
             return false; 
         }
     }
+    fprintf(stderr, "\n \n");
+
     strncpy(users[userCount].username, username,MAX_USERNAME);
     strncpy(users[userCount].password, pass,MAX_PASSWORD);
     userCount++;
     return true;
 }
+
