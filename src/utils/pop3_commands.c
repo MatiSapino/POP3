@@ -22,7 +22,7 @@ static enum pop3_state executeDELE(struct selector_key *selector_key, struct com
 static enum pop3_state executeNOOP(struct selector_key *selector_key, struct command *command);
 static enum pop3_state executeRSET(struct selector_key *selector_key, struct command *command);
 
-static void listCommands(struct command_function *commands, struct Client *client);
+static void listCommands(struct command_function commands[], struct Client *client);
 
 static struct command_function commands_anonymous[] = {
     {"USER", executeUSER},
@@ -134,7 +134,7 @@ static enum pop3_state executeCAPA(struct selector_key *key, struct command *com
     return STATE_WRITE;
 }
 
-static void listCommands(struct command_function *commands, struct Client *client) {
+static void listCommands(struct command_function commands[], struct Client* client) {
     for (int i = 0; commands[i].name != NULL; i++) {
         response(client, commands[i].name);
     }
