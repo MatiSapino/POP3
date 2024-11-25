@@ -57,10 +57,6 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
 
 static enum pop3_state executeUser(struct selector_key * selector_key, struct command * command){
     fprintf(stderr, "Executing USER\n");
-    fprintf(stderr, "Command args1 address: %p\n", (void*)command->args1);
-    if(command->args1) {
-        fprintf(stderr, "Username argument: %s\n", command->args1);
-    }
     struct Client * client = selector_key->data;
     
     if(client->user == NULL){
@@ -74,7 +70,7 @@ static enum pop3_state executeUser(struct selector_key * selector_key, struct co
         return STATE_WRITE;
     }
 
-    strncpy(client->user->username, (char *)command->args1, MAX_USERNAME);
+    strncpy(client->user->username, (char *)command->args1, MAX_USERNAME-1);
     client->user->username[MAX_USERNAME - 1] = '\0';
     
     fprintf(stderr, "Size of user struct: %zu\n", sizeof(struct user));

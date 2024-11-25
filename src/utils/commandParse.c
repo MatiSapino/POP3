@@ -62,7 +62,7 @@ static enum commandState parse_command(struct commandParse * commandParse, uint8
         fprintf(stderr, "Setting args1 to offset: %ld\n", 
                 (long)(commandParse->command->args1 - commandParse->command->data));
       } else {
-        commandParse->command->args2 = &(commandParse->command->data[commandParse->bytes - 1]);
+        commandParse->command->args2 = commandParse->command->data + (commandParse->bytes - 1);
         fprintf(stderr, "Setting args2 to position: %d\n", commandParse->bytes - 1);
       }
       commandParse->prevState = CMD_ARGS;
@@ -92,9 +92,9 @@ static enum commandState parse_command(struct commandParse * commandParse, uint8
   } else if (commandParse->state == CMD_ARGS) {
     if (c != ' ' && c != '\t' && c != '\r' && commandParse->prevState == CMD_DISPATCHER) {
       if (commandParse->command->args1 == NULL) {
-        commandParse->command->args1 = &(commandParse->command->data[commandParse->bytes - 1]);
+        commandParse->command->args1 = commandParse->command->data + (commandParse->bytes - 1);
       } else {
-        commandParse->command->args2 = &(commandParse->command->data[commandParse->bytes - 1]);
+        commandParse->command->args2 = commandParse->command->data + (commandParse->bytes - 1);
       }
       commandParse->prevState = CMD_ARGS;
     } else if (c == ' ' && commandParse->prevState == CMD_ARGS) {
