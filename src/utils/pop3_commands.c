@@ -189,54 +189,62 @@ static enum pop3_state executeLIST(struct selector_key *key, struct command *com
 static enum pop3_state executeRETR(struct selector_key *key, struct command *command) {
     struct Client *client = key->data;
     
+    fprintf(stderr, "Executing RETR\n");
+
     if (!client->authenticated) {
+        fprintf(stderr, "Client not authenticated\n");
         errResponse(client, "not authenticated");
         return STATE_WRITE;
     }
     
-    // Verificar que se proporcionó un número de mensaje
     if (command->args1 == NULL) {
+        fprintf(stderr, "Missing message number\n");
         errResponse(client, "missing message number");
         return STATE_WRITE;
     }
     
-    // Convertir el argumento a número
     char *endptr;
     long msg_num = strtol((char *)command->args1, &endptr, 10);
     if (*endptr != '\0' || msg_num <= 0) {
+        fprintf(stderr, "Invalid message number: %s\n", (char *)command->args1);
         errResponse(client, "invalid message number");
         return STATE_WRITE;
     }
     
-    // Obtener el mailbox del usuario
     struct mailbox *box = get_user_mailbox(client->user->username);
     if (!box) {
+        fprintf(stderr, "Mailbox error for user: %s\n", client->user->username);
         errResponse(client, "mailbox error");
         return STATE_WRITE;
     }
     
-    // Verificar que el número de mensaje es válido
+    fprintf(stderr, "Mailbox obtained for user: %s\n", client->user->username);
+
     if (msg_num > box->mail_count) {
+        fprintf(stderr, "No such message: %ld\n", msg_num);
         errResponse(client, "no such message");
         free(box);
         return STATE_WRITE;
     }
     
-    // Obtener el mensaje específico
     struct mail *mail = &box->mails[msg_num - 1];
+    fprintf(stderr, "Message found: %ld\n", msg_num);
+    fprintf(stderr, "Message filename: %s\n", mail->filename);
+    fprintf(stderr, "Message size: %ld\n", mail->size);
+
     if (mail->deleted) {
+        fprintf(stderr, "Message has been deleted: %ld\n", msg_num);
         errResponse(client, "message has been deleted");
         free(box);
         return STATE_WRITE;
     }
     
-    // Construir rutas de archivos
     char input_path[PATH_MAX];
     char output_path[PATH_MAX];
     char maildir[PATH_MAX];
     
-    // Obtener el maildir base
     if (getenv("HOME") == NULL) {
+        fprintf(stderr, "HOME environment variable not set\n");
         errResponse(client, "internal server error");
         free(box);
         return STATE_WRITE;
@@ -251,33 +259,38 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     snprintf(output_path, sizeof(output_path), "%s/%s.transformed", 
              maildir, mail->filename);
     
-    // Aplicar transformaciones
-    if (!transform_apply(input_path, output_path)) {
-        errResponse(client, "transformation error");
-        free(box);
-        return STATE_WRITE;
-    }
+    fprintf(stderr, "Input path: %s\n", input_path);
+    // fprintf(stderr, "Output path: %s\n", output_path);
+
+    // if (!transform_apply(input_path, output_path)) {
+    //     fprintf(stderr, "Transformation error for file: %s\n", input_path);
+    //     errResponse(client, "transformation error");
+    //     free(box);
+    //     return STATE_WRITE;
+    // }
     
-    // Abrir el archivo transformado
-    FILE *file = fopen(output_path, "r");
+    // fprintf(stderr, "Transformation applied to file: %s\n", input_path);
+
+    // FILE *file = fopen(output_path, "r");
+    FILE *file = fopen(input_path, "r");
     if (!file) {
+        fprintf(stderr, "Could not open transformed message: %s\n", output_path);
         errResponse(client, "could not open message");
-        unlink(output_path);  // Eliminar archivo temporal
+        unlink(output_path);
         free(box);
         return STATE_WRITE;
     }
     
-    // Obtener tamaño del archivo transformado
     fseek(file, 0, SEEK_END);
     long transformed_size = ftell(file);
     fseek(file, 0, SEEK_SET);
     
-    // Enviar respuesta OK con el tamaño
+    fprintf(stderr, "fseek terminado\n");
+
     char res[64];
     snprintf(res, sizeof(res), "message follows (%ld octets)", transformed_size);
     okResponse(client, res);
     
-    // Leer y enviar el contenido del archivo
     char buffer[1024];
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
@@ -289,12 +302,10 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
         buffer_write_adv(&client->outputBuffer, to_write);
     }
     
-    // Agregar terminador
     response(client, "\r\n.\r\n");
     
-    // Limpieza
     fclose(file);
-    unlink(output_path);  // Eliminar archivo temporal
+    unlink(output_path);
     free(box);
     
     return STATE_WRITE;

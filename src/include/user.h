@@ -12,6 +12,7 @@
 #define MAX_PASSWORD 40
 #define MAX_USERS 1024
 #define MAX_MAILS 1000
+#define PATH_MAX 1024
 
 struct user {
     char username[MAX_USERNAME];

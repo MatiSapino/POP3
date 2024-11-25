@@ -86,6 +86,9 @@ static enum pop3_state parseInput(struct selector_key * selector_key, struct Cli
         if (commandState == CMD_OK) {
             fprintf(stderr, "Command is OK\n");
             state = executeCommand(selector_key, client->commandParse->command);
+            if(state==STATE_CLOSE){
+                fprintf(stderr, "command is ok and state is close\n");    
+            }
             reset_commandParser(client->commandParse);
             return state;
         }
@@ -171,7 +174,7 @@ static unsigned writeToClient(struct selector_key * selector_key) {
     buffer_read_adv(&client->outputBuffer, count);
 
     if (client->closed) {
-        return STATE_ERROR;
+        return STATE_CLOSE;
     }
 
     if (buffer_can_read(&client->outputBuffer)) {
@@ -277,16 +280,14 @@ static void closeConnection(struct selector_key * key) {
     if (client->commandParse != NULL) {
         free_commandParser(client->commandParse);
     }
-
     if (key->fd != -1) {
-        selector_unregister_fd(key->s, key->fd);
+        fprintf(stderr, "key->fd !=-1\n");     
+        selector_unregister_fd(key->s, key->fd);    
+        fprintf(stderr, "unregistered\n");
         close(key->fd);
     }
-
-    // TODO: i need to close the email fd
-
+    fprintf(stderr, "sali del if\n");
     free(client);
-
     metrics_connection_closed();
 }
 
