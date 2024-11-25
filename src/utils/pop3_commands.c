@@ -11,17 +11,18 @@ struct command_function {
     enum pop3_state (*function)(struct selector_key * selector_key, struct command * command);
 };
 
-static enum pop3_state executeUSER(struct selector_key *key, struct command *command);
-static enum pop3_state executePASS(struct selector_key *key, struct command *command);
-static enum pop3_state executeQUIT(struct selector_key *key, struct command *command);
-static enum pop3_state executeCAPA(struct selector_key *key, struct command *command);
-static enum pop3_state executeSTAT(struct selector_key *key, struct command *command);
-static enum pop3_state executeLIST(struct selector_key *key, struct command *command);
-static enum pop3_state executeRETR(struct selector_key *key, struct command *command);
-static enum pop3_state executeDELE(struct selector_key *key, struct command *command);
-static enum pop3_state executeNOOP(struct selector_key *key, struct command *command);
-static enum pop3_state executeRSET(struct selector_key *key, struct command *command);
+static enum pop3_state executeUSER(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executePASS(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executeQUIT(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executeCAPA(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executeSTAT(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executeLIST(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executeRETR(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executeDELE(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executeNOOP(struct selector_key *selector_key, struct command *command);
+static enum pop3_state executeRSET(struct selector_key *selector_key, struct command *command);
 
+static void listCommands(struct command_function *commands, struct Client *client);
 
 static struct command_function commands_anonymous[] = {
     {"USER", executeUSER},
@@ -109,6 +110,7 @@ static enum pop3_state executePASS(struct selector_key * key, struct command * c
 
     if(check_password(client->user->username, (char*)command->args1, client)){
         strcpy(client->user->password, (char*)command->args1);
+        client->authenticated = true;
         okResponse(client, "maildrop locked and ready");
     }     
     return STATE_WRITE;   
@@ -124,14 +126,21 @@ static enum pop3_state executeCAPA(struct selector_key *key, struct command *com
     struct Client * client = key->data;
     fprintf(stderr, "Executing CAPA\n");
     okResponse(client, "Capability list follows");
-    int commands_count = sizeof(commands_authenticated)/sizeof(commands_authenticated[0]);
-    for (size_t i = 0; i < commands_count; i++)
-    {
-        if(commands_authenticated[i].name != NULL)
-            response(client, commands_authenticated[i].name);
-    }
+
+    if (client->authenticated) listCommands(commands_authenticated, client);
+    else listCommands(commands_anonymous, client);
+
     response(client, ".");
     return STATE_WRITE;
+}
+
+static void listCommands(struct command_function *commands, struct Client *client){
+    int commands_count = sizeof(*commands)/sizeof(commands[0]);
+    for (size_t i = 0; i < commands_count; i++)
+    {
+        if(commands[i].name != NULL)
+            response(client, commands[i].name);
+    }
 }
 
 static enum pop3_state executeSTAT(struct selector_key *key, struct command *command){
