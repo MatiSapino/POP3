@@ -3,6 +3,7 @@
 #include "pop3_commands.h"
 #include "user.h"
 #include "../include/transform.h"
+#include "../include/metrics.h"
 
 
 extern struct pop3_args pop3_args;  //ver que onda este extern
@@ -118,10 +119,40 @@ static enum pop3_state executePASS(struct selector_key * key, struct command * c
     return STATE_WRITE;   
 }
 
-static enum pop3_state executeQUIT(struct selector_key *key, struct command *command){
-    struct Client * client = key->data;
-    client->closed = true; 
-    okResponse(client, "Bye");
+static enum pop3_state executeQUIT(struct selector_key *key, struct command *command) {
+    struct Client *client = key->data;
+    
+    fprintf(stderr, "DEBUG: Executing QUIT command\n");
+    
+    if (client->authenticated) {
+        // Obtener el mailbox del usuario
+        struct mailbox *box = get_user_mailbox(client->user->username);
+        if (box) {
+            // Eliminar físicamente los mensajes marcados
+            char filepath[PATH_MAX];
+            char maildir[PATH_MAX];
+            
+            snprintf(maildir, sizeof(maildir), "%s/maildir/%s/new", 
+                     getenv("HOME"), client->user->username);
+            
+            for (size_t i = 0; i < box->mail_count; i++) {
+                if (box->mails[i].deleted) {
+                    snprintf(filepath, sizeof(filepath), "%s/%s", 
+                             maildir, box->mails[i].filename);
+                    unlink(filepath);  // Eliminar el archivo
+                }
+            }
+            
+            free(box);
+        }
+    }
+    
+    client->closed = true;
+    okResponse(client, "POP3 server signing off");
+    
+    log_command(client->authenticated ? client->user->username : "anonymous", 
+                "QUIT", "session ended");
+    
     return STATE_CLOSE;
 }
 
@@ -311,9 +342,72 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     return STATE_WRITE;
 }
 
-static enum pop3_state executeDELE(struct selector_key *key, struct command *command){
-    struct Client * client = key->data;
-    fprintf(stderr, "Executing DELE\n");
+static enum pop3_state executeDELE(struct selector_key *key, struct command *command) {
+    struct Client *client = key->data;
+    
+    fprintf(stderr, "DEBUG: Executing DELE command\n");
+
+    // Verificar autenticación
+    if (!client->authenticated) {
+        fprintf(stderr, "DEBUG: Client not authenticated\n");
+        errResponse(client, "not authenticated");
+        return STATE_WRITE;
+    }
+    
+    // Verificar que se proporcionó un número de mensaje
+    if (command->args1 == NULL) {
+        fprintf(stderr, "DEBUG: Missing message number\n");
+        errResponse(client, "missing message number");
+        return STATE_WRITE;
+    }
+    
+    // Convertir el argumento a número
+    char *endptr;
+    long msg_num = strtol((char *)command->args1, &endptr, 10);
+    if (*endptr != '\0' || msg_num <= 0) {
+        fprintf(stderr, "DEBUG: Invalid message number: %s\n", (char *)command->args1);
+        errResponse(client, "invalid message number");
+        return STATE_WRITE;
+    }
+    
+    // Obtener el mailbox del usuario
+    struct mailbox *box = get_user_mailbox(client->user->username);
+    if (!box) {
+        fprintf(stderr, "DEBUG: Mailbox error for user: %s\n", client->user->username);
+        errResponse(client, "mailbox error");
+        return STATE_WRITE;
+    }
+    
+    // Verificar que el número de mensaje es válido
+    if (msg_num > box->mail_count) {
+        fprintf(stderr, "DEBUG: No such message: %ld\n", msg_num);
+        errResponse(client, "no such message");
+        free(box);
+        return STATE_WRITE;
+    }
+    
+    // Verificar si el mensaje ya está marcado como eliminado
+    struct mail *mail = &box->mails[msg_num - 1];
+    if (mail->deleted) {
+        fprintf(stderr, "DEBUG: Message already deleted: %ld\n", msg_num);
+        errResponse(client, "message already deleted");
+        free(box);
+        return STATE_WRITE;
+    }
+    
+    // Marcar el mensaje como eliminado
+    mail->deleted = true;
+    box->total_size -= mail->size;  // Actualizar el tamaño total del mailbox
+    
+    // Registrar la acción en el log
+    char response[64];
+    snprintf(response, sizeof(response), "message %ld deleted", msg_num);
+    log_command(client->user->username, "DELE", response);
+    
+    // Enviar respuesta exitosa
+    okResponse(client, response);
+    
+    free(box);
     return STATE_WRITE;
 }
 
@@ -323,9 +417,47 @@ static enum pop3_state executeNOOP(struct selector_key *key, struct command *com
     return STATE_WRITE;
 }
 
-static enum pop3_state executeRSET(struct selector_key *key, struct command *command){
-    struct Client * client = key->data;
-    fprintf(stderr, "Executing RSET\n");
+static enum pop3_state executeRSET(struct selector_key *key, struct command *command) {
+    struct Client *client = key->data;
+    
+    fprintf(stderr, "DEBUG: Executing RSET command\n");
+
+    // Verificar autenticación
+    if (!client->authenticated) {
+        fprintf(stderr, "DEBUG: Client not authenticated\n");
+        errResponse(client, "not authenticated");
+        return STATE_WRITE;
+    }
+    
+    // Obtener el mailbox del usuario
+    struct mailbox *box = get_user_mailbox(client->user->username);
+    if (!box) {
+        fprintf(stderr, "DEBUG: Mailbox error for user: %s\n", client->user->username);
+        errResponse(client, "mailbox error");
+        return STATE_WRITE;
+    }
+    
+    // Restaurar todos los mensajes marcados como eliminados
+    size_t restored_count = 0;
+    box->total_size = 0;  // Recalcular el tamaño total
+    
+    for (size_t i = 0; i < box->mail_count; i++) {
+        if (box->mails[i].deleted) {
+            box->mails[i].deleted = false;
+            restored_count++;
+        }
+        box->total_size += box->mails[i].size;
+    }
+    
+    // Registrar la acción en el log
+    char response[64];
+    snprintf(response, sizeof(response), "%zu messages restored", restored_count);
+    log_command(client->user->username, "RSET", response);
+    
+    // Enviar respuesta exitosa
+    okResponse(client, "maildrop has been reset");
+    
+    free(box);
     return STATE_WRITE;
 }
 
