@@ -94,6 +94,14 @@ static enum pop3_state parseInput(struct selector_key * selector_key, struct Cli
 static unsigned readCommand(struct selector_key * selector_key) {
     struct Client * client = selector_key->data;
 
+    if (client == NULL) {
+        fprintf(stderr, "client is NULL in readCommand\n");
+        return STATE_ERROR;
+    }
+    if (client->user == NULL) {
+        fprintf(stderr, "client->user is NULL in readCommand\n");
+    }
+
     size_t limit;
     ssize_t count;
     uint8_t * buffer;

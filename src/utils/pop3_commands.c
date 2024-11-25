@@ -28,6 +28,21 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
     struct command_function * commandFunction;
     int i;
 
+    // Verificar si selector_key o client son NULL
+    if (selector_key == NULL) {
+        fprintf(stderr, "selector_key is NULL in executeCommand\n");
+        return STATE_ERROR;
+    }
+    if (client == NULL) {
+        fprintf(stderr, "client is NULL in executeCommand\n");
+        return STATE_ERROR;
+    }
+    if (client->user == NULL) {
+        fprintf(stderr, "client->user is NULL in executeCommand\n");
+    }
+    
+    fprintf(stderr, "Executing command: %s\n", (char *)command->data);
+
     commandFunction = commands;
 
     for (i = 0; commandFunction[i].name != NULL; i++) {
@@ -43,15 +58,21 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
 static enum pop3_state executeUser(struct selector_key * selector_key, struct command * command){
     fprintf(stderr, "Executing USER\n");
     struct Client * client = selector_key->data;
-    if(client->user==NULL){
-        fprintf(stderr, "Client is NULL\n");
+    
+    if(client->user == NULL){
+        fprintf(stderr, "Client->user is NULL\n");
+        errResponse(client, "Internal server error");
+        return STATE_WRITE;
     }
+
     if(command->args1 == NULL){
         errResponse(client, "Invalid argument");
         return STATE_WRITE;
     }
 
-    strncpy(client->user->username, (char *)command->args1, 41);
+    strncpy(client->user->username, (char *)command->args1, MAX_USERNAME);
+    client->user->username[MAX_USERNAME - 1] = '\0';
+    
     okResponse(client, "User accepted");
     return STATE_WRITE;
 }
