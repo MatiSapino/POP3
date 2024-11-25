@@ -14,11 +14,18 @@ struct command_function {
 static enum pop3_state executeUser(struct selector_key *key, struct command *command);
 static enum pop3_state executePass(struct selector_key *key, struct command *command);
 static enum pop3_state executeQuit(struct selector_key *key, struct command *command);
+static enum pop3_state executeCapa(struct selector_key *key, struct command *command);
 
 
-static struct command_function commands[] = {
+static struct command_function commands_anonymous[] = {
     {"USER", executeUser},
     {"PASS", executePass},
+    {"QUIT", executeQuit},
+    {"CAPA", executeCapa},
+    {NULL, NULL},
+};
+
+static struct command_function commands_authenticated[] = {
     {"QUIT", executeQuit},
     {NULL, NULL},
 };
@@ -44,7 +51,7 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
     
     fprintf(stderr, "Executing command: %s\n", (char *)command->data);
 
-    commandFunction = commands;
+    commandFunction = commands_anonymous;
 
     for (i = 0; commandFunction[i].name != NULL; i++) {
         if (strcasecmp(commandFunction[i].name, (char *)command->data) == 0) {
@@ -97,5 +104,18 @@ static enum pop3_state executePass(struct selector_key * key, struct command * c
 static enum pop3_state executeQuit(struct selector_key *key, struct command *command){
     struct Client * client = key->data;
     client->closed = true; 
+    return STATE_WRITE;
+}
+
+static enum pop3_state executeCapa(struct selector_key *key, struct command *command){
+    struct Client * client = key->data;
+    fprintf(stderr, "Executing CAPA\n");
+    okResponse(client, "Capability list follows");
+    int commands_count = sizeof(commands_authenticated)/sizeof(commands_authenticated[0]);
+    for (size_t i = 0; i < commands_count; i++)
+    {
+        okResponse(client, commands_authenticated[i].name);
+    }
+    okResponse(client, ".");
     return STATE_WRITE;
 }
