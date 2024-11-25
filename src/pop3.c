@@ -72,8 +72,10 @@ void response(struct Client * client, const char * message) {
 }
 
 static enum pop3_state parseInput(struct selector_key * selector_key, struct Client * client) {
+    fprintf(stderr, "Starting parseInput\n");
     enum pop3_state state;
     while (buffer_can_read(&client->inputBuffer) && buffer_fits(&client->outputBuffer, BUFFER_SPACE)) {
+        fprintf(stderr, "Parsing command...\n");
         enum commandState commandState = valid_command(&client->inputBuffer, client->commandParse);
 
         if (commandState == CMD_OK) {
@@ -92,6 +94,7 @@ static enum pop3_state parseInput(struct selector_key * selector_key, struct Cli
 }
 
 static unsigned readCommand(struct selector_key * selector_key) {
+    fprintf(stderr, "Starting readCommand\n");
     struct Client * client = selector_key->data;
 
     if (client == NULL) {
@@ -109,6 +112,7 @@ static unsigned readCommand(struct selector_key * selector_key) {
     enum pop3_state states;
 
     buffer = buffer_write_ptr(&client->inputBuffer, &limit);
+    fprintf(stderr, "About to recv. Buffer: %p, limit: %zu\n", (void*)buffer, limit);
     count = recv(selector_key->fd, buffer, limit, MSG_NOSIGNAL);
 
     if (count <= 0 && limit != 0) {
@@ -333,6 +337,10 @@ void passiveAccept(struct selector_key * key) {
     if (client == NULL) {
         goto handle_error;
     }
+    fprintf(stderr, "Client allocated at: %p\n", (void*)client);
+    
+    client->user = malloc(sizeof(struct user));
+    fprintf(stderr, "User allocated at: %p\n", (void*)client->user);
 
     client->addr = clientAddr;
 
