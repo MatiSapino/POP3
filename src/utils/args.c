@@ -30,6 +30,7 @@ static void user(char *s, struct users *user) {
     } else {
         *p = 0;
         p++;
+        //Aca se rompe 
         user->name = s;
         user->pass = p;
     }
@@ -73,7 +74,7 @@ static void usage(const char *progname) {
 
 void parse_args(const int argc, char **argv, struct pop3_args *args) {
     memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
-    struct users * usr;
+    struct users usr = {0};
 
     args->pop3_addr = "0.0.0.0";
     args->pop3_port = 1080;
@@ -108,10 +109,11 @@ void parse_args(const int argc, char **argv, struct pop3_args *args) {
             //     args->mng_port   = port(optarg);
             //     break;
             case 'u':
-                user(optarg,usr);
-                add_user(usr->name,usr->pass);
+                fprintf(stderr, "printing user->name: ");
+                user(optarg,&usr);
+                fprintf(stderr, "%s:%s\n", usr.name,usr.pass);
+                add_user(usr.name,usr.pass);
                 // if(nusers >= MAX_USERS) {
-                //     fprintf(stderr, "maximun number of command line users reached: %d.\n", MAX_USERS);
                 //     exit(1);
                 // } else {
                 //     user(optarg, args->users + nusers);

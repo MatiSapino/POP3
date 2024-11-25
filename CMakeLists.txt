@@ -16,7 +16,7 @@ message(STATUS "PROJECT_ROOT_DIR: ${PROJECT_ROOT_DIR}")
 add_subdirectory(src)
 
 # Set the compiler flags
-set(CMAKE_C_FLAGS    "-pthread -g  -ggdb --std=c11 -pedantic -pedantic-errors -gdwarf-4
+set(CMAKE_C_FLAGS    "-pthread -g  -ggdb --std=c11 -pedantic -pedantic-errors -gdwarf-4 -fsanitize=address
                       -Wall -Wextra -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
                       -I ${INCLUDE_DIR}")
 

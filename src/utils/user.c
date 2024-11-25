@@ -9,7 +9,7 @@ static size_t users_count = 0;
 
 static struct user users[MAX_USERS];
 static int userCount = 0;
-static char* maildir;
+static char maildir[100];
 
 bool set_maildir() {
     char full_path[256]; 
@@ -79,15 +79,15 @@ bool unlock_user(const char *username, const char *maildir){
 
 
 bool add_user(char* username, char* pass){
+    fprintf(stderr, "Adding user %s\n", username);
     if(userCount>=MAX_USERS){
         return false;
     }
+    fprintf(stderr, "Creating user dir\n");
     size_t len = strlen(maildir) + strlen(username) + 2;
 
     char path[len]; 
     snprintf(path, sizeof(path), "%s/%s", maildir, username);
-
-    // Permisos: 0755 (lectura/escritura para el propietario, lectura para otros)
     if (mkdir(path, 0755) != 0) {
         return false;
     }
