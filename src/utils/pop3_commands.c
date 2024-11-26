@@ -301,7 +301,7 @@ static enum pop3_state executeLIST(struct selector_key *key, struct command *com
 static enum pop3_state executeRETR(struct selector_key *key, struct command *command) {
     struct Client *client = key->data;
     
-    fprintf(stderr, "Executing RETR\n");
+    fprintf(stderr, "DEBUG: Executing RETR\n");
 
     if (!client->authenticated) {
         errResponse(client, "not authenticated");
@@ -350,7 +350,6 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     // Construir rutas
     char input_path[PATH_MAX];
     char output_path[PATH_MAX];
-    char final_path[PATH_MAX];
     char maildir[PATH_MAX];
     
     if (getenv("HOME") == NULL) {
@@ -365,23 +364,16 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
              maildir, mail->filename);
     snprintf(output_path, sizeof(output_path), "%s/%s.transformed", 
              maildir, mail->filename);
-    snprintf(final_path, sizeof(final_path), "%s/%s.final", 
-             maildir, mail->filename);
-    
-    // Si hay un comando de transformación, agregarlo
-    if (transform_cmd != NULL) {
-        // Agregar la transformación temporalmente
-        char transform_name[32];
-        snprintf(transform_name, sizeof(transform_name), "temp_%ld", msg_num);
-        
 
-        bool success = transform_apply(input_path, output_path, transform_name, client);
-        
-        // Eliminar la transformación temporal
-        transform_set_enabled(transform_name, false);
+    bool success = true;
+    if (transform_cmd != NULL && strlen(transform_cmd) > 0) {
+        // Si hay un comando de transformación, intentar aplicarlo
+        fprintf(stderr, "DEBUG: Applying transformation: %s\n", transform_cmd);
+        success = transform_apply(input_path, output_path, transform_cmd, client);
         
         if (!success) {
-            errResponse(client, "transformation error");
+            fprintf(stderr, "DEBUG: Transformation failed\n");
+            errResponse(client, "transformation error or command not found");
             return STATE_WRITE;
         }
     } else {
@@ -405,7 +397,7 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     }
     
     // Leer y enviar el contenido transformado
-    FILE *file = fopen(output_path, "r");
+    FILE *file = fopen(success ? output_path : input_path, "r");
     if (!file) {
         errResponse(client, "could not open message");
         unlink(output_path);
@@ -437,7 +429,9 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     
     // Limpieza
     fclose(file);
-    unlink(output_path);
+    if (success) {
+        unlink(output_path);
+    }
     
     return STATE_WRITE;
 }
