@@ -127,7 +127,7 @@ static enum pop3_state executeQUIT(struct selector_key *key, struct command *com
     
     if (client->authenticated) {
         // Obtener el mailbox del usuario
-        struct mailbox *box = get_user_mailbox(client->user->username);
+        struct mailbox *box = get_user_mailbox(client);
         if (box) {
             // Eliminar físicamente los mensajes marcados
             char filepath[PATH_MAX];
@@ -194,7 +194,7 @@ static enum pop3_state executeSTAT(struct selector_key *key, struct command *com
         return STATE_WRITE;
     }
     
-    struct mailbox *box = get_user_mailbox(client->user->username);
+    struct mailbox *box = get_user_mailbox(client);
     if (!box) {
         fprintf(stderr, "DEBUG: Error obteniendo mailbox\n");
         errResponse(client, "mailbox error");
@@ -224,7 +224,7 @@ static enum pop3_state executeLIST(struct selector_key *key, struct command *com
     }
     
     // Obtener el mailbox del usuario
-    struct mailbox *box = get_user_mailbox(client->user->username);
+    struct mailbox *box = get_user_mailbox(client);
     if (!box) {
         fprintf(stderr, "DEBUG: Mailbox error for user: %s\n", client->user->username);
         errResponse(client, "mailbox error");
@@ -313,7 +313,7 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
         return STATE_WRITE;
     }
     
-    struct mailbox *box = get_user_mailbox(client->user->username);
+    struct mailbox *box = get_user_mailbox(client);
     if (!box) {
         fprintf(stderr, "Mailbox error for user: %s\n", client->user->username);
         errResponse(client, "mailbox error");
@@ -437,7 +437,7 @@ static enum pop3_state executeDELE(struct selector_key *key, struct command *com
     }
     
     // Obtener el mailbox del usuario
-    struct mailbox *box = get_user_mailbox(client->user->username);
+    struct mailbox *box = get_user_mailbox(client);
     if (!box) {
         fprintf(stderr, "DEBUG: Mailbox error for user: %s\n", client->user->username);
         errResponse(client, "mailbox error");
@@ -507,7 +507,7 @@ static enum pop3_state executeRSET(struct selector_key *key, struct command *com
     }
     
     // Obtener el mailbox del usuario
-    struct mailbox *box = get_user_mailbox(client->user->username);
+    struct mailbox *box = get_user_mailbox(client);
     if (!box) {
         fprintf(stderr, "DEBUG: Mailbox error for user: %s\n", client->user->username);
         errResponse(client, "mailbox error");
