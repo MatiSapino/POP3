@@ -206,3 +206,6 @@ void init_mailbox(struct Client* client){
     client->mailbox = box;
 }
 
+void print_maildir(){
+    fprintf(stderr, "%s\n", maildir);
+}

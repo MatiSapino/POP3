@@ -4,6 +4,14 @@
 #include <stdbool.h>
 #include "user.h"
 
+struct doh {
+    char           *host;
+    char           *ip;
+    unsigned short  port;
+    char           *path;
+    char           *query;
+};
+
 struct pop3_args {
     char * pop3_addr;
     unsigned short pop3_port;
@@ -16,13 +24,6 @@ struct users {
     char *pass;
 };
 
-struct doh {
-    char           *host;
-    char           *ip;
-    unsigned short  port;
-    char           *path;
-    char           *query;
-};
 
 struct socks5args {
     char           *socks_addr;

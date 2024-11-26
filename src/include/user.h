@@ -43,4 +43,5 @@ bool add_user(char* username, char* pass);
 void init_mailbox(struct Client* client);
 struct mailbox * get_user_mailbox(struct Client* client);
 void free_mailbox(struct mailbox *box);
+void print_maildir();
 #endif

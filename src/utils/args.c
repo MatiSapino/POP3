@@ -38,9 +38,9 @@ static void user(char *s, struct users *user) {
 }
 
 static void version(void) {
-    fprintf(stderr, "socks5v version 0.0\n"
-                    "ITBA Protocolos de Comunicación 2020/1 -- Grupo X\n"
-                    "AQUI VA LA LICENCIA\n");
+    fprintf(stderr, "POP3 version 1.0\n"
+                    "ITBA Protocolos de Comunicación 2024 -- Grupo 7\n"
+                    "La licencia nos pertenece\n");
 }
 
 /*
@@ -85,62 +85,37 @@ void parse_args(const int argc, char **argv, struct pop3_args *args) {
     int c;
 
     while (true) {
-        c = getopt(argc, argv, "hl:L:Np:P:u:v:d");
+        c = getopt(argc, argv, "hl:L:Np:P:u:vd");
         if (c == -1)
             break;
 
         switch (c) {
-            // case 'h':
-            //     usage(argv[0]);
-            //     break;
+            case 'h':
+                usage(argv[0]);
+                break;
             case 'l':
                 args->pop3_addr = optarg;
                 break;
-            // case 'L':
-            //     args->mng_addr = optarg;
-            //     break;
-            // case 'N':
-            //     args->disectors_enabled = false; 
-            //     break;
+            case 'L':
+                args->mng_addr = optarg;
+                break;
             case 'p':
                 args->pop3_port = port(optarg);
                 break;
-            // case 'd':
-            //       args->maildir = optarg;
-            //       break;
-            // case 'P':
-            //     args->mng_port   = port(optarg);
-            //     break;
+            case 'd':
+                  print_maildir();
+                  break;
+            case 'P':
+                args->mng_port   = port(optarg);
+                break;
             case 'u':
                 user(optarg,&usr);
                 add_user(usr.name,usr.pass);
-                // if(nusers >= MAX_USERS) {
-                //     exit(1);
-                // } else {
-                //     user(optarg, args->users + nusers);
-                //     nusers++;
-                // }
-
                 break;
-            // case 'v':
-            //     version();
-            //     exit(0);
-            //     break;
-            // case 0xD001:
-            //     args->doh.ip = optarg;
-            //     break;
-            // case 0xD002:
-            //     args->doh.port = port(optarg);
-            //     break;
-            // case 0xD003:
-            //     args->doh.host = optarg;
-            //     break;
-            // case 0xD004:
-            //     args->doh.path = optarg;
-            //     break;
-            // case 0xD005:
-            //     args->doh.query = optarg;
-            //     break;
+            case 'v':
+                version();
+                exit(0);
+                break;
             default:
                 fprintf(stderr, "unknown argument %d.\n", c);
                 exit(1);

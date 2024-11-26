@@ -32,6 +32,7 @@ static void sigterm_handler(const int signal) {
 }
 
 int main(const int argc, char **argv) {
+    
     if(!set_maildir()){
         fprintf(stderr, "Couldn't create maildir");
         goto finally;
