@@ -2,6 +2,7 @@
 #include "include/commandParse.h"
 #include "include/pop3_commands.h"
 #include "include/metrics.h"
+#include "include/netutils.h"
 
 // allow to work on macOS
 #ifndef MSG_NOSIGNAL
@@ -277,9 +278,13 @@ static const struct state_definition client_states[] = {
 static void closeConnection(struct selector_key * key) {
     struct Client * client = key->data;
 
+    // TODO: this should close connection for auth user, do the other thing for unauth
+    sockaddr_to_human_buffered((struct sockaddr*)&client->addr);
+
     if (client->commandParse != NULL) {
         free_commandParser(client->commandParse);
     }
+
     if (key->fd != -1) {
         fprintf(stderr, "key->fd !=-1\n");     
         selector_unregister_fd(key->s, key->fd);    

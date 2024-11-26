@@ -1,7 +1,7 @@
 #include <string.h>
 #include <strings.h>
-#include "pop3_commands.h"
-#include "user.h"
+#include "../include/pop3_commands.h"
+#include "../include/user.h"
 #include "../include/transform.h"
 #include "../include/metrics.h"
 
@@ -75,6 +75,8 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
             return commandFunction[i].function(selector_key, command);
         }
     }
+
+    reset_commandParser(client->commandParse);
 
     return STATE_WRITE;
 }
@@ -154,7 +156,7 @@ static enum pop3_state executeQUIT(struct selector_key *key, struct command *com
     log_command(client->authenticated ? client->user->username : "anonymous", 
                 "QUIT", "session ended");
     
-    return STATE_CLOSE;
+    return STATE_WRITE;
 }
 
 static enum pop3_state executeCAPA(struct selector_key *key, struct command *command){
@@ -359,18 +361,18 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
              maildir, mail->filename);
     
     fprintf(stderr, "Input path: %s\n", input_path);
-    // fprintf(stderr, "Output path: %s\n", output_path);
+    fprintf(stderr, "Output path: %s\n", output_path);
 
-    // if (!transform_apply(input_path, output_path)) {
-    //     fprintf(stderr, "Transformation error for file: %s\n", input_path);
-    //     errResponse(client, "transformation error");
-    //     free(box);
-    //     return STATE_WRITE;
-    // }
-    
-    // fprintf(stderr, "Transformation applied to file: %s\n", input_path);
-
-    // FILE *file = fopen(output_path, "r");
+//    if (!transform_apply(input_path, output_path)) {
+//        fprintf(stderr, "Transformation error for file: %s\n", input_path);
+//        errResponse(client, "transformation error");
+//        free(box);
+//        return STATE_WRITE;
+//    }
+//
+//    fprintf(stderr, "Transformation applied to file: %s\n", input_path);
+//
+//    FILE *file = fopen(output_path, "r");
     FILE *file = fopen(input_path, "r");
     if (!file) {
         fprintf(stderr, "Could not open transformed message: %s\n", output_path);

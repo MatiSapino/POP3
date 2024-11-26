@@ -4,7 +4,7 @@
 #include <string.h>    /* memset */
 #include <errno.h>
 #include <getopt.h>
-#include "args.h"
+#include "../include/args.h"
 
 struct pop3_args pop3_args;
 
