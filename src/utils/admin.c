@@ -22,7 +22,6 @@ static void handle_get_metrics(struct admin_client *client);
 static void handle_admin_command(struct admin_client *client, char *command);
 static void handle_transform_add(struct admin_client *client, const char *name, const char *command);
 static void handle_transform_list(struct admin_client *client);
-static void admin_accept(struct selector_key *key);
 
 static void admin_read(struct selector_key *key) {
     printf("DEBUG: Iniciando admin_read\n");
@@ -73,8 +72,14 @@ static void admin_read(struct selector_key *key) {
         // Es un socket de cliente, manejar la lectura de datos
         struct admin_client *client = (struct admin_client *)key->data;
         
-        size_t space = buffer_available_space(&client->read_buffer);
+        size_t space;
         uint8_t *ptr = buffer_write_ptr(&client->read_buffer, &space);
+        if (!buffer_can_write(&client->read_buffer)) {
+            // Buffer lleno
+            selector_unregister_fd(key->s, key->fd);
+            admin_close(key);
+            return;
+        }
         
         ssize_t n = read(key->fd, ptr, space);
         if (n <= 0) {
@@ -201,49 +206,6 @@ static void handle_transform_list(struct admin_client *client) {
     char buffer[ADMIN_BUFFER_SIZE];
     transform_list(buffer, sizeof(buffer));
     write_string_to_buffer(&client->write_buffer, buffer);
-}
-
-static void admin_accept(struct selector_key *key) {
-    fprintf(stderr, "DEBUG: Iniciando admin_accept\n");
-    
-    struct sockaddr_in client_addr;
-    socklen_t client_addr_len = sizeof(client_addr);
-    
-    const int client_fd = accept(key->fd, (struct sockaddr*)&client_addr, &client_addr_len);
-    if (client_fd < 0) {
-        fprintf(stderr, "DEBUG: Error en accept. client_fd = %d\n", client_fd);
-        return;
-    }
-    
-    // Crear y configurar el cliente
-    struct admin_client *client = malloc(sizeof(*client));
-    if (client == NULL) {
-        close(client_fd);
-        return;
-    }
-    
-    // Inicializar el cliente y sus buffers
-    memset(client, 0, sizeof(*client));
-    client->fd = client_fd;
-    client->closed = false;
-    
-    // Inicializar los buffers
-    buffer_init(&client->read_buffer, ADMIN_BUFFER_SIZE, client->read_buffer_data);
-    buffer_init(&client->write_buffer, ADMIN_BUFFER_SIZE, client->write_buffer_data);
-    
-    // Hacer el socket no bloqueante
-    int flags = fcntl(client_fd, F_GETFL, 0);
-    fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
-    
-    // Registrar para lectura
-    selector_status status = selector_register(key->s, client_fd, &admin_handler, OP_READ, client);
-    if (status != SELECTOR_SUCCESS) {
-        free(client);
-        close(client_fd);
-        return;
-    }
-    
-    fprintf(stderr, "DEBUG: Cliente administrativo conectado\n");
 }
 
 void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector selector) {

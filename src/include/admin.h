@@ -1,13 +1,10 @@
 #ifndef ADMIN_H
 #define ADMIN_H
 
-#include <stddef.h>
-#include <stdbool.h>
 #include "selector.h"
 #include "buffer.h"
 
-#define ADMIN_BUFFER_SIZE 1024
-#define MAX_ADMIN_ARGS 3
+#define ADMIN_BUFFER_SIZE 4096
 
 enum admin_state {
     ADMIN_READ,
@@ -25,10 +22,10 @@ struct admin_client {
     bool closed;
 };
 
+// Funciones públicas
 void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector selector);
-void admin_accept(struct selector_key *key);
+void admin_write(struct selector_key *key);
 void admin_close(struct selector_key *key);
 void admin_read(struct selector_key *key);
-void admin_write(struct selector_key *key);
 
 #endif 
