@@ -22,6 +22,7 @@ static void handle_get_metrics(struct admin_client *client);
 static void handle_admin_command(struct admin_client *client, char *command);
 static void handle_transform_add(struct admin_client *client, const char *name, const char *command);
 static void handle_transform_list(struct admin_client *client);
+static void handle_transform_test(struct admin_client *client, const char *name, const char *input);
 
 void admin_read(struct selector_key *key) {
     fprintf(stderr, "DEBUG: Iniciando admin_read\n");
@@ -182,20 +183,33 @@ static void handle_admin_command(struct admin_client *client, char *command) {
         handle_get_metrics(client);
     } else if (strcmp(cmd, "transform") == 0) {
         char *subcmd = strtok(NULL, " ");
+        fprintf(stderr, "DEBUG: Subcomando transform: '%s'\n", subcmd);
+        
         if (subcmd == NULL) {
             write_string_to_buffer(&client->write_buffer, "Invalid transform command\n");
             return;
         }
 
         if (strcmp(subcmd, "list") == 0) {
+            fprintf(stderr, "DEBUG: Ejecutando transform list\n");
             handle_transform_list(client);
         } else if (strcmp(subcmd, "add") == 0) {
             char *name = strtok(NULL, " ");
             char *cmd = strtok(NULL, "");
+            fprintf(stderr, "DEBUG: Transform add - name: '%s', cmd: '%s'\n", name, cmd);
+            
             if (name && cmd) {
                 handle_transform_add(client, name, cmd);
             } else {
                 write_string_to_buffer(&client->write_buffer, "Usage: transform add <name> <command>\n");
+            }
+        } else if (strcmp(subcmd, "test") == 0) {
+            char *name = strtok(NULL, " ");
+            char *input = strtok(NULL, "");
+            if (name && input) {
+                handle_transform_test(client, name, input);
+            } else {
+                write_string_to_buffer(&client->write_buffer, "Usage: transform test <name> <input>\n");
             }
         } else {
             write_string_to_buffer(&client->write_buffer, "Unknown transform command\n");
@@ -241,6 +255,17 @@ static void handle_transform_list(struct admin_client *client) {
     char buffer[ADMIN_BUFFER_SIZE];
     transform_list(buffer, sizeof(buffer));
     write_string_to_buffer(&client->write_buffer, buffer);
+}
+
+static void handle_transform_test(struct admin_client *client, const char *name, const char *input) {
+    char output[ADMIN_BUFFER_SIZE];
+    if (transform_test(name, input, output, sizeof(output))) {
+        char response[ADMIN_BUFFER_SIZE];
+        snprintf(response, sizeof(response), "Transform result: %s\n", output);
+        write_string_to_buffer(&client->write_buffer, response);
+    } else {
+        write_string_to_buffer(&client->write_buffer, "Transform test failed\n");
+    }
 }
 
 void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector selector) {
