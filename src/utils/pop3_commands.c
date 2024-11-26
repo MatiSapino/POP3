@@ -317,15 +317,13 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     char *msg_num_str = (char *)command->args1;
     char *transform_cmd = NULL;
     
-    // Buscar el pipe con espacios alrededor
-    char *pipe = strstr(msg_num_str, " | ");
+    // Buscar el pipe
+    char *pipe = strchr(msg_num_str, '|');
     if (pipe != NULL) {
         *pipe = '\0';  // Separar el número del comando
-        transform_cmd = pipe + 3;  // Saltar " | "
-    } else if (strchr(msg_num_str, '|') != NULL) {
-        // Si hay un pipe pero sin los espacios requeridos
-        errResponse(client, "invalid command format - use: RETR <message-number> | <transformation>");
-        return STATE_WRITE;
+        transform_cmd = pipe + 1;
+        // Eliminar espacios al inicio del comando
+        while (*transform_cmd == ' ') transform_cmd++;
     }
     
     // Convertir el número de mensaje
