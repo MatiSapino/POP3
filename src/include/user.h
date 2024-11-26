@@ -40,6 +40,7 @@ bool check_user_locked(const char *username, const char *maildir);
 bool lock_user(const char *username, const char *maildir);
 bool unlock_user(const char *username, const char *maildir);
 bool add_user(char* username, char* pass);
-struct mailbox * get_user_mailbox(const char *username);
+void init_mailbox(const char *username, struct Client* client);
+struct mailbox * get_user_mailbox(struct Client* client);
 
 #endif

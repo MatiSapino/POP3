@@ -141,11 +141,19 @@ bool add_user(char* username, char* pass){
     return true;
 }
 
-struct mailbox * get_user_mailbox(const char *username) {
+struct mailbox * get_user_mailbox(struct Client* client) {
+    return client->mailbox;
+}
+
+void free_mailbox(struct mailbox *box){
+    free(box);
+}
+
+void init_mailbox(const char *username, struct Client* client){
     struct mailbox *box = malloc(sizeof(struct mailbox));
     if (box == NULL) {
         fprintf(stderr, "Error: No se pudo asignar memoria para mailbox\n");
-        return NULL;
+        return;
     }
     
     memset(box, 0, sizeof(struct mailbox));
@@ -158,7 +166,7 @@ struct mailbox * get_user_mailbox(const char *username) {
     if (!dir) {
         fprintf(stderr, "Error: No se pudo abrir el directorio %s (errno: %d)\n", path, errno);
         free(box);
-        return NULL;
+        return;
     }
 
     struct dirent *entry;
@@ -195,6 +203,6 @@ struct mailbox * get_user_mailbox(const char *username) {
             box->mail_count, box->total_size);
     
     closedir(dir);
-    return box;
+    client->mailbox = box;
 }
 

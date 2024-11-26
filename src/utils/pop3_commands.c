@@ -114,6 +114,7 @@ static enum pop3_state executePASS(struct selector_key * key, struct command * c
     if(check_password(client->user->username, (char*)command->args1, client)){
         strcpy(client->user->password, (char*)command->args1);
         client->authenticated = true;
+        init_mailbox(client->user->username, client);
         okResponse(client, "maildrop locked and ready");
     }     
     return STATE_WRITE;   
@@ -143,7 +144,7 @@ static enum pop3_state executeQUIT(struct selector_key *key, struct command *com
                 }
             }
             
-            free(box);
+            free_mailbox(box);
         }
     }
     
