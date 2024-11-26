@@ -178,7 +178,6 @@ static struct transform* find_transform(const char *name) {
 bool transform_test(const char *name, const char *input, char *output, size_t output_size) {
     fprintf(stderr, "DEBUG: transform_test - name: '%s', input: '%s'\n", name, input);
     
-    // Buscar la transformación por nombre
     struct transform *t = find_transform(name);
     if (t == NULL) {
         fprintf(stderr, "DEBUG: Transformación '%s' no encontrada\n", name);
@@ -186,43 +185,63 @@ bool transform_test(const char *name, const char *input, char *output, size_t ou
     }
     fprintf(stderr, "DEBUG: Encontrada transformación '%s' con comando '%s'\n", name, t->command);
 
-    // Crear un pipe para la comunicación
-    int pipefd[2];
-    if (pipe(pipefd) == -1) {
-        fprintf(stderr, "DEBUG: Error creando pipe: %s\n", strerror(errno));
+    int input_pipe[2];   // Padre -> Hijo
+    int output_pipe[2];  // Hijo -> Padre
+    
+    if (pipe(input_pipe) == -1 || pipe(output_pipe) == -1) {
+        fprintf(stderr, "DEBUG: Error creando pipes: %s\n", strerror(errno));
         return false;
     }
 
-    // Fork para ejecutar el comando
     pid_t pid = fork();
     if (pid == -1) {
         fprintf(stderr, "DEBUG: Error en fork: %s\n", strerror(errno));
-        close(pipefd[0]);
-        close(pipefd[1]);
         return false;
     }
 
     if (pid == 0) {  // Proceso hijo
-        close(pipefd[0]);  // Cerrar extremo de lectura
-        dup2(pipefd[1], STDOUT_FILENO);
-        close(pipefd[1]);
+        // Configurar stdin desde input_pipe
+        close(input_pipe[1]);  // Cerrar extremo de escritura del input
+        dup2(input_pipe[0], STDIN_FILENO);
+        close(input_pipe[0]);
 
-        // Ejecutar el comando
-        fprintf(stderr, "DEBUG: Hijo ejecutando comando: sh -c '%s'\n", t->command);
-        execlp("sh", "sh", "-c", t->command, NULL);
+        // Configurar stdout hacia output_pipe
+        close(output_pipe[0]);  // Cerrar extremo de lectura del output
+        dup2(output_pipe[1], STDOUT_FILENO);
+        close(output_pipe[1]);
+
+        // Eliminar comillas extras del comando si existen
+        char *cmd = strdup(t->command);
+        if (cmd[0] == '\'' && cmd[strlen(cmd)-1] == '\'') {
+            cmd[strlen(cmd)-1] = '\0';
+            cmd++;
+        }
+        
+        fprintf(stderr, "DEBUG: Hijo ejecutando comando: sh -c '%s'\n", cmd);
+        execlp("sh", "sh", "-c", cmd, NULL);
         fprintf(stderr, "DEBUG: Error ejecutando comando: %s\n", strerror(errno));
         exit(1);
     }
 
     // Proceso padre
-    close(pipefd[1]);  // Cerrar extremo de escritura
+    close(input_pipe[0]);   // Cerrar extremo de lectura del input
+    close(output_pipe[1]);  // Cerrar extremo de escritura del output
+
+    // Remover comillas del input si existen
+    char *clean_input = strdup(input);
+    if (clean_input[0] == '\'' && clean_input[strlen(clean_input)-1] == '\'') {
+        clean_input[strlen(clean_input)-1] = '\0';
+        clean_input++;
+    }
     
-    // Escribir input al pipe
-    ssize_t bytes_written = write(pipefd[0], input, strlen(input));
+    // Escribir input
+    ssize_t bytes_written = write(input_pipe[1], clean_input, strlen(clean_input));
+    close(input_pipe[1]);  // Cerrar después de escribir
     fprintf(stderr, "DEBUG: Escritos %zd bytes al pipe\n", bytes_written);
 
     // Leer resultado
-    ssize_t bytes_read = read(pipefd[0], output, output_size - 1);
+    ssize_t bytes_read = read(output_pipe[0], output, output_size - 1);
+    close(output_pipe[0]);
     fprintf(stderr, "DEBUG: Leídos %zd bytes del pipe\n", bytes_read);
     
     if (bytes_read < 0) {
@@ -231,10 +250,8 @@ bool transform_test(const char *name, const char *input, char *output, size_t ou
     }
     output[bytes_read] = '\0';
 
-    // Esperar que termine el hijo
     int status;
     waitpid(pid, &status, 0);
-    
     fprintf(stderr, "DEBUG: Proceso hijo terminó con estado %d\n", WEXITSTATUS(status));
 
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
