@@ -198,6 +198,8 @@ static void handle_admin_command(struct admin_client *client, char *command) {
             "  transform list       - List available transformations\n"
             "  transform add <name> <cmd> - Add new transformation\n"
             "  transform test <name> <input> - Test transformation\n"
+            "  transform enable <name> - Enable transformation\n"
+            "  transform disable <name> - Disable transformation\n"
             "  config get          - Show current configuration\n"
             "  config set timeout <sec[.nsec]> - Set select timeout\n"
             "  config set buffer_size <bytes> - Set I/O buffer size\n"
