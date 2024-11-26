@@ -25,6 +25,7 @@ static void handle_transform_list(struct admin_client *client);
 static void handle_transform_test(struct admin_client *client, const char *name, const char *input);
 static void handle_config_command(struct admin_client *client, char *args);
 static void handle_transform_command(struct admin_client *client, char *args);
+static void handle_user_history(struct admin_client *client, const char *username);
 
 static struct server_config current_config = {
     .select_timeout = {.tv_sec = 10, .tv_nsec = 0},
@@ -185,6 +186,10 @@ static void handle_admin_command(struct admin_client *client, char *command) {
     if (strcmp(cmd, "metrics") == 0) {
         handle_get_metrics(client);
     }
+    else if (strcmp(cmd, "history") == 0) {
+        char *username = strtok(NULL, " ");
+        handle_user_history(client, username);
+    }
     else if (strcmp(cmd, "transform") == 0) {
         handle_transform_command(client, strtok(NULL, ""));
     }
@@ -195,6 +200,7 @@ static void handle_admin_command(struct admin_client *client, char *command) {
         const char *help_text =
             "Available commands:\n"
             "  metrics              - Show server metrics\n"
+            "  history <username>   - Show command history for a specific user\n"
             "  transform list       - List available transformations\n"
             "  transform add <name> <cmd> - Add new transformation\n"
             "  transform test <name> <input> - Test transformation\n"
@@ -406,6 +412,43 @@ static void handle_transform_command(struct admin_client *client, char *args) {
         write_string_to_buffer(&client->write_buffer, 
             "Unknown transform command. Use: list, add, test, enable, disable\n");
     }
+}
+
+static void handle_user_history(struct admin_client *client, const char *username) {
+    if (username == NULL) {
+        write_string_to_buffer(&client->write_buffer, "Usage: history <username>\n");
+        return;
+    }
+
+    FILE *log = fopen("pop3_access.log", "r");
+    if (log == NULL) {
+        write_string_to_buffer(&client->write_buffer, "Error: Could not open log file\n");
+        return;
+    }
+
+    char line[1024];
+    char response[ADMIN_BUFFER_SIZE] = "";
+    size_t total_len = 0;
+    
+    while (fgets(line, sizeof(line), log)) {
+        if (strstr(line, username) != NULL) {
+            size_t line_len = strlen(line);
+            if (total_len + line_len < ADMIN_BUFFER_SIZE - 1) {
+                strcat(response, line);
+                total_len += line_len;
+            } else {
+                break; // Evitar desbordamiento del buffer
+            }
+        }
+    }
+    
+    fclose(log);
+
+    if (total_len == 0) {
+        snprintf(response, sizeof(response), "No commands found for user: %s\n", username);
+    }
+
+    write_string_to_buffer(&client->write_buffer, response);
 }
 
 bool config_set_timeout(long seconds, long nanoseconds) {

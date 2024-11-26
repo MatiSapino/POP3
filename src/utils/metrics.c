@@ -37,8 +37,9 @@ void log_command(const char *username, const char *command, const char *response
     
     FILE *log = fopen("pop3_access.log", "a");
     if (log != NULL) {
-        fprintf(log, "[%s] User: %s, Command: %s, Response: %s\n", 
-                timestamp, username ? username : "anonymous", 
+        fprintf(log, "[%s] User: %-15s | Command: %-10s | Response: %s\n", 
+                timestamp, 
+                username ? username : "anonymous", 
                 command ? command : "unknown", 
                 response ? response : "no response");
         fclose(log);
