@@ -23,6 +23,15 @@ static void handle_admin_command(struct admin_client *client, char *command);
 static void handle_transform_add(struct admin_client *client, const char *name, const char *command);
 static void handle_transform_list(struct admin_client *client);
 static void handle_transform_test(struct admin_client *client, const char *name, const char *input);
+static void handle_config_command(struct admin_client *client, char *args);
+static void handle_transform_command(struct admin_client *client, char *args);
+
+static struct server_config current_config = {
+    .select_timeout = {.tv_sec = 10, .tv_nsec = 0},
+    .buffer_size = 4096,
+    .max_connections = 1000,
+    .verbose_logging = false
+};
 
 void admin_read(struct selector_key *key) {
     fprintf(stderr, "DEBUG: Iniciando admin_read\n");
@@ -167,54 +176,37 @@ static void write_string_to_buffer(struct buffer *buffer, const char *str) {
 }
 
 static void handle_admin_command(struct admin_client *client, char *command) {
-    fprintf(stderr, "DEBUG: Iniciando handle_admin_command con comando: '%s'\n", command);
-    
     char *cmd = strtok(command, " ");
     if (cmd == NULL) {
-        fprintf(stderr, "DEBUG: Comando inválido (NULL)\n");
         write_string_to_buffer(&client->write_buffer, "Invalid command\n");
         return;
     }
 
-    fprintf(stderr, "DEBUG: Comando parseado: '%s'\n", cmd);
-
     if (strcmp(cmd, "metrics") == 0) {
-        fprintf(stderr, "DEBUG: Ejecutando comando metrics\n");
         handle_get_metrics(client);
-    } else if (strcmp(cmd, "transform") == 0) {
-        char *subcmd = strtok(NULL, " ");
-        fprintf(stderr, "DEBUG: Subcomando transform: '%s'\n", subcmd);
-        
-        if (subcmd == NULL) {
-            write_string_to_buffer(&client->write_buffer, "Invalid transform command\n");
-            return;
-        }
-
-        if (strcmp(subcmd, "list") == 0) {
-            fprintf(stderr, "DEBUG: Ejecutando transform list\n");
-            handle_transform_list(client);
-        } else if (strcmp(subcmd, "add") == 0) {
-            char *name = strtok(NULL, " ");
-            char *cmd = strtok(NULL, "");
-            fprintf(stderr, "DEBUG: Transform add - name: '%s', cmd: '%s'\n", name, cmd);
-            
-            if (name && cmd) {
-                handle_transform_add(client, name, cmd);
-            } else {
-                write_string_to_buffer(&client->write_buffer, "Usage: transform add <name> <command>\n");
-            }
-        } else if (strcmp(subcmd, "test") == 0) {
-            char *name = strtok(NULL, " ");
-            char *input = strtok(NULL, "");
-            if (name && input) {
-                handle_transform_test(client, name, input);
-            } else {
-                write_string_to_buffer(&client->write_buffer, "Usage: transform test <name> <input>\n");
-            }
-        } else {
-            write_string_to_buffer(&client->write_buffer, "Unknown transform command\n");
-        }
-    } else {
+    }
+    else if (strcmp(cmd, "transform") == 0) {
+        handle_transform_command(client, strtok(NULL, ""));
+    }
+    else if (strcmp(cmd, "config") == 0) {
+        handle_config_command(client, strtok(NULL, ""));
+    }
+    else if (strcmp(cmd, "help") == 0) {
+        const char *help_text =
+            "Available commands:\n"
+            "  metrics              - Show server metrics\n"
+            "  transform list       - List available transformations\n"
+            "  transform add <name> <cmd> - Add new transformation\n"
+            "  transform test <name> <input> - Test transformation\n"
+            "  config get          - Show current configuration\n"
+            "  config set timeout <sec[.nsec]> - Set select timeout\n"
+            "  config set buffer_size <bytes> - Set I/O buffer size\n"
+            "  config set max_connections <num> - Set max connections\n"
+            "  config set verbose <true|false> - Enable/disable verbose logging\n"
+            "  help                - Show this help\n";
+        write_string_to_buffer(&client->write_buffer, help_text);
+    }
+    else {
         write_string_to_buffer(&client->write_buffer, "Unknown command\n");
     }
 }
@@ -266,6 +258,190 @@ static void handle_transform_test(struct admin_client *client, const char *name,
     } else {
         write_string_to_buffer(&client->write_buffer, "Transform test failed\n");
     }
+}
+
+static void handle_config_command(struct admin_client *client, char *args) {
+    char *subcmd = strtok(args, " ");
+    if (subcmd == NULL) {
+        write_string_to_buffer(&client->write_buffer, "Usage: config <get|set> [parameter] [value]\n");
+        return;
+    }
+
+    if (strcmp(subcmd, "get") == 0) {
+        char response[ADMIN_BUFFER_SIZE];
+        snprintf(response, sizeof(response),
+            "Current Configuration:\n"
+            "  timeout: %ld.%09ld seconds\n"
+            "  buffer_size: %zu bytes\n"
+            "  max_connections: %u\n"
+            "  verbose_logging: %s\n",
+            current_config.select_timeout.tv_sec,
+            current_config.select_timeout.tv_nsec,
+            current_config.buffer_size,
+            current_config.max_connections,
+            current_config.verbose_logging ? "enabled" : "disabled");
+        write_string_to_buffer(&client->write_buffer, response);
+    } 
+    else if (strcmp(subcmd, "set") == 0) {
+        char *param = strtok(NULL, " ");
+        char *value = strtok(NULL, " ");
+        
+        if (!param || !value) {
+            write_string_to_buffer(&client->write_buffer, "Usage: config set <parameter> <value>\n");
+            return;
+        }
+
+        if (strcmp(param, "timeout") == 0) {
+            char *dot = strchr(value, '.');
+            long seconds, nanoseconds = 0;
+            
+            if (dot) {
+                *dot = '\0';
+                seconds = atol(value);
+                nanoseconds = atol(dot + 1);
+            } else {
+                seconds = atol(value);
+            }
+
+            if (config_set_timeout(seconds, nanoseconds)) {
+                write_string_to_buffer(&client->write_buffer, "Timeout updated successfully\n");
+            } else {
+                write_string_to_buffer(&client->write_buffer, "Failed to update timeout\n");
+            }
+        }
+        else if (strcmp(param, "buffer_size") == 0) {
+            size_t size = atol(value);
+            if (config_set_buffer_size(size)) {
+                write_string_to_buffer(&client->write_buffer, "Buffer size updated successfully\n");
+            } else {
+                write_string_to_buffer(&client->write_buffer, "Failed to update buffer size\n");
+            }
+        }
+        else if (strcmp(param, "max_connections") == 0) {
+            unsigned int max = atoi(value);
+            if (config_set_max_connections(max)) {
+                write_string_to_buffer(&client->write_buffer, "Max connections updated successfully\n");
+            } else {
+                write_string_to_buffer(&client->write_buffer, "Failed to update max connections\n");
+            }
+        }
+        else if (strcmp(param, "verbose") == 0) {
+            bool enabled = strcmp(value, "true") == 0 || strcmp(value, "1") == 0;
+            if (config_set_verbose(enabled)) {
+                write_string_to_buffer(&client->write_buffer, "Verbose logging updated successfully\n");
+            } else {
+                write_string_to_buffer(&client->write_buffer, "Failed to update verbose logging\n");
+            }
+        }
+        else {
+            write_string_to_buffer(&client->write_buffer, "Unknown parameter\n");
+        }
+    }
+    else {
+        write_string_to_buffer(&client->write_buffer, "Unknown config command\n");
+    }
+}
+
+static void handle_transform_command(struct admin_client *client, char *args) {
+    char *subcmd = strtok(args, " ");
+    if (subcmd == NULL) {
+        write_string_to_buffer(&client->write_buffer, 
+            "Usage: transform <list|add|test|enable|disable> [args...]\n");
+        return;
+    }
+
+    if (strcmp(subcmd, "list") == 0) {
+        handle_transform_list(client);
+    }
+    else if (strcmp(subcmd, "add") == 0) {
+        char *name = strtok(NULL, " ");
+        char *cmd = strtok(NULL, "");  // Obtiene el resto de la línea como comando
+        
+        if (!name || !cmd) {
+            write_string_to_buffer(&client->write_buffer, 
+                "Usage: transform add <name> <command>\n");
+            return;
+        }
+        
+        // Eliminar espacios al inicio del comando
+        while (*cmd == ' ') cmd++;
+        
+        handle_transform_add(client, name, cmd);
+    }
+    else if (strcmp(subcmd, "test") == 0) {
+        char *name = strtok(NULL, " ");
+        char *input = strtok(NULL, "");  // Obtiene el resto como input
+        
+        if (!name || !input) {
+            write_string_to_buffer(&client->write_buffer, 
+                "Usage: transform test <name> <input_text>\n");
+            return;
+        }
+        
+        // Eliminar espacios al inicio del input
+        while (*input == ' ') input++;
+        
+        handle_transform_test(client, name, input);
+    }
+    else if (strcmp(subcmd, "enable") == 0 || strcmp(subcmd, "disable") == 0) {
+        char *name = strtok(NULL, " ");
+        if (!name) {
+            write_string_to_buffer(&client->write_buffer, 
+                "Usage: transform enable/disable <name>\n");
+            return;
+        }
+        
+        bool enable = (strcmp(subcmd, "enable") == 0);
+        if (transform_set_enabled(name, enable)) {
+            write_string_to_buffer(&client->write_buffer, 
+                enable ? "Transform enabled\n" : "Transform disabled\n");
+        } else {
+            write_string_to_buffer(&client->write_buffer, 
+                "Transform not found\n");
+        }
+    }
+    else {
+        write_string_to_buffer(&client->write_buffer, 
+            "Unknown transform command. Use: list, add, test, enable, disable\n");
+    }
+}
+
+bool config_set_timeout(long seconds, long nanoseconds) {
+    if (seconds < 0 || nanoseconds < 0 || nanoseconds >= 1000000000) {
+        return false;
+    }
+    
+    current_config.select_timeout.tv_sec = seconds;
+    current_config.select_timeout.tv_nsec = nanoseconds;
+    
+    // Actualizar el timeout en el selector
+    // selector_set_timeout(key->s, current_config.select_timeout);
+    return true;
+}
+
+bool config_set_buffer_size(size_t size) {
+    if (size < 1024 || size > 1048576) { // Entre 1KB y 1MB
+        return false;
+    }
+    current_config.buffer_size = size;
+    return true;
+}
+
+bool config_set_max_connections(unsigned int max) {
+    if (max < 1 || max > 10000) {
+        return false;
+    }
+    current_config.max_connections = max;
+    return true;
+}
+
+bool config_set_verbose(bool enabled) {
+    current_config.verbose_logging = enabled;
+    return true;
+}
+
+void config_get_current(struct server_config *config) {
+    memcpy(config, &current_config, sizeof(struct server_config));
 }
 
 void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector selector) {
