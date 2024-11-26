@@ -304,53 +304,53 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     fprintf(stderr, "Executing RETR\n");
 
     if (!client->authenticated) {
-        fprintf(stderr, "Client not authenticated\n");
         errResponse(client, "not authenticated");
         return STATE_WRITE;
     }
     
     if (command->args1 == NULL) {
-        fprintf(stderr, "Missing message number\n");
         errResponse(client, "missing message number");
         return STATE_WRITE;
     }
     
+    // Parsear el número de mensaje y la transformación opcional
+    char *msg_num_str = (char *)command->args1;
+    char *transform_cmd = NULL;
+    
+    // Buscar el pipe
+    char *pipe = strchr(msg_num_str, '|');
+    if (pipe != NULL) {
+        *pipe = '\0';  // Separar el número del comando
+        transform_cmd = pipe + 1;
+        // Eliminar espacios al inicio del comando
+        while (*transform_cmd == ' ') transform_cmd++;
+    }
+    
+    // Convertir el número de mensaje
     char *endptr;
-    long msg_num = strtol((char *)command->args1, &endptr, 10);
+    long msg_num = strtol(msg_num_str, &endptr, 10);
     if (*endptr != '\0' || msg_num <= 0) {
-        fprintf(stderr, "Invalid message number: %s\n", (char *)command->args1);
         errResponse(client, "invalid message number");
         return STATE_WRITE;
     }
     
+    // Obtener el mailbox y verificar el mensaje
     struct mailbox *box = get_user_mailbox(client);
-    if (!box) {
-        fprintf(stderr, "Mailbox error for user: %s\n", client->user->username);
-        errResponse(client, "mailbox error");
-        return STATE_WRITE;
-    }
-    
-    fprintf(stderr, "Mailbox obtained for user: %s\n", client->user->username);
-
-    if (msg_num > box->mail_count) {
-        fprintf(stderr, "No such message: %ld\n", msg_num);
+    if (!box || msg_num > box->mail_count) {
         errResponse(client, "no such message");
         return STATE_WRITE;
     }
     
     struct mail *mail = &box->mails[msg_num - 1];
-    fprintf(stderr, "Message found: %ld\n", msg_num);
-    fprintf(stderr, "Message filename: %s\n", mail->filename);
-    fprintf(stderr, "Message size: %ld\n", mail->size);
-
     if (mail->deleted) {
-        fprintf(stderr, "Message has been deleted: %ld\n", msg_num);
         errResponse(client, "message has been deleted");
         return STATE_WRITE;
     }
     
+    // Construir rutas
     char input_path[PATH_MAX];
     char output_path[PATH_MAX];
+    char final_path[PATH_MAX];
     char maildir[PATH_MAX];
     
     if (getenv("HOME") == NULL) {
@@ -361,57 +361,81 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     
     snprintf(maildir, sizeof(maildir), "%s/maildir/%s/new", 
              getenv("HOME"), client->user->username);
-    
     snprintf(input_path, sizeof(input_path), "%s/%s", 
              maildir, mail->filename);
-    
     snprintf(output_path, sizeof(output_path), "%s/%s.transformed", 
              maildir, mail->filename);
+    snprintf(final_path, sizeof(final_path), "%s/%s.final", 
+             maildir, mail->filename);
     
-    fprintf(stderr, "Input path: %s\n", input_path);
-    fprintf(stderr, "Output path: %s\n", output_path);
+    // Si hay un comando de transformación, agregarlo
+    if (transform_cmd != NULL) {
+        // Agregar la transformación temporalmente
+        char transform_name[32];
+        snprintf(transform_name, sizeof(transform_name), "temp_%ld", msg_num);
+        
 
-//    if (!transform_apply(input_path, output_path)) {
-//        fprintf(stderr, "Transformation error for file: %s\n", input_path);
-//        errResponse(client, "transformation error");
-//        free(box);
-//        return STATE_WRITE;
-//    }
-//
-//    fprintf(stderr, "Transformation applied to file: %s\n", input_path);
-//
-//    FILE *file = fopen(output_path, "r");
-    FILE *file = fopen(input_path, "r");
+        bool success = transform_apply(input_path, output_path, transform_name, client);
+        
+        // Eliminar la transformación temporal
+        transform_set_enabled(transform_name, false);
+        
+        if (!success) {
+            errResponse(client, "transformation error");
+            return STATE_WRITE;
+        }
+    } else {
+        // Sin transformación, solo copiar el archivo
+        FILE *src = fopen(input_path, "r");
+        FILE *dst = fopen(output_path, "w");
+        if (!src || !dst) {
+            errResponse(client, "could not access message");
+            if (src) fclose(src);
+            if (dst) fclose(dst);
+            return STATE_WRITE;
+        }
+        
+        char buffer[1024];
+        size_t bytes;
+        while ((bytes = fread(buffer, 1, sizeof(buffer), src)) > 0) {
+            fwrite(buffer, 1, bytes, dst);
+        }
+        fclose(src);
+        fclose(dst);
+    }
+    
+    // Leer y enviar el contenido transformado
+    FILE *file = fopen(output_path, "r");
     if (!file) {
-        fprintf(stderr, "Could not open transformed message: %s\n", output_path);
         errResponse(client, "could not open message");
         unlink(output_path);
         return STATE_WRITE;
     }
     
+    // Obtener tamaño del archivo
     fseek(file, 0, SEEK_END);
-    long transformed_size = ftell(file);
+    long size = ftell(file);
     fseek(file, 0, SEEK_SET);
     
-    fprintf(stderr, "fseek terminado\n");
-
+    // Enviar respuesta OK con el tamaño
     char res[64];
-    snprintf(res, sizeof(res), "message follows (%ld octets)", transformed_size);
+    snprintf(res, sizeof(res), "message follows (%ld octets)", size);
     okResponse(client, res);
     
+    // Enviar contenido
     char buffer[1024];
     size_t bytes_read;
     while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
         size_t limit;
         uint8_t *write_ptr = buffer_write_ptr(&client->outputBuffer, &limit);
         size_t to_write = bytes_read < limit ? bytes_read : limit;
-        
         memcpy(write_ptr, buffer, to_write);
         buffer_write_adv(&client->outputBuffer, to_write);
     }
     
     response(client, "\r\n.\r\n");
     
+    // Limpieza
     fclose(file);
     unlink(output_path);
     

@@ -3,10 +3,12 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-
+#include "pop3.h"
 #define MAX_TRANSFORM_NAME 32
 #define MAX_TRANSFORM_CMD 256
 #define MAX_TRANSFORMS 10
+
+struct Client;
 
 struct transform {
     char name[MAX_TRANSFORM_NAME];
@@ -19,6 +21,8 @@ struct transform_manager {
     size_t transform_count;
 };
 
+
+
 // Inicializa el sistema de transformaciones
 void transform_init(void);
 
@@ -29,7 +33,7 @@ bool transform_add(const char *name, const char *command);
 bool transform_set_enabled(const char *name, bool enabled);
 
 // Aplica las transformaciones habilitadas a un archivo
-bool transform_apply(const char *input_file, const char *output_file);
+bool transform_apply(const char *input_file, const char *output_file, const char *transform_name, struct Client *client);
 
 // Lista las transformaciones disponibles
 void transform_list(char *buffer, size_t buffer_size);

@@ -27,6 +27,16 @@ void transform_init(void) {
     }
 }
 
+ struct transform * find_transform(const char *name) {
+    fprintf(stderr, "DEBUG: Buscando transformación '%s'\n", name);
+    for (size_t i = 0; i < manager.transform_count; i++) {
+        if (strcmp(manager.transforms[i].name, name) == 0) {
+            return &manager.transforms[i];
+        }
+    }
+    return NULL;
+}
+
 bool transform_add(const char *name, const char *command) {
     fprintf(stderr, "DEBUG: Agregando transformación '%s' con comando '%s'\n", name, command);
     if (manager.transform_count >= MAX_TRANSFORMS) {
@@ -85,7 +95,14 @@ static bool apply_single_transform(const char *command, int input_fd, int output
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 }
 
-bool transform_apply(const char *input_file, const char *output_file) {
+bool transform_apply(const char *input_file, const char *output_file, const char *transform_name, struct Client *client) {
+    struct transform *t = find_transform(transform_name);
+    if (t == NULL) {
+        fprintf(stderr, "DEBUG: Transformación '%s' no encontrada\n", transform_name);
+        errResponse(client, "transformation not found");
+        return false;
+    }
+
     int input_fd = open(input_file, O_RDONLY);
     if (input_fd == -1) {
         fprintf(stderr, "Cannot open input file: %s\n", strerror(errno));
@@ -96,13 +113,10 @@ bool transform_apply(const char *input_file, const char *output_file) {
     const char *current_input = input_file;
     int current_input_fd = input_fd;
     
-    for (size_t i = 0; i < manager.transform_count; i++) {
-        if (!manager.transforms[i].enabled) {
-            continue;
-        }
+    if (t->enabled) {
         
         // Crear archivo temporal para esta transformación
-        snprintf(temp_path, sizeof(temp_path), "%s.%zu.tmp", output_file, i);
+        snprintf(temp_path, sizeof(temp_path), "%s.%s.tmp", output_file, transform_name);
         
         // Abrir archivo de salida
         int output_fd = open(temp_path, 
@@ -114,9 +128,9 @@ bool transform_apply(const char *input_file, const char *output_file) {
             close(current_input_fd);
             return false;
         }
-        
+
         // Aplicar la transformación
-        bool success = apply_single_transform(manager.transforms[i].command, 
+        bool success = apply_single_transform(t->command, 
                                            current_input_fd, 
                                            output_fd);
         
@@ -128,7 +142,7 @@ bool transform_apply(const char *input_file, const char *output_file) {
         }
         
         if (!success) {
-            fprintf(stderr, "Transform failed: %s\n", manager.transforms[i].name);
+            fprintf(stderr, "Transform failed: %s\n", t->name);
             unlink(temp_path);
             return false;
         }
@@ -140,8 +154,8 @@ bool transform_apply(const char *input_file, const char *output_file) {
             fprintf(stderr, "Cannot open intermediate file: %s\n", strerror(errno));
             return false;
         }
-    }
     
+    }
     // Mover el último archivo temporal al archivo de salida final
     if (rename(current_input, output_file) == -1) {
         fprintf(stderr, "Cannot rename final file: %s\n", strerror(errno));
@@ -163,16 +177,6 @@ void transform_list(char *buffer, size_t buffer_size) {
                          manager.transforms[i].command,
                          manager.transforms[i].enabled ? "enabled" : "disabled");
     }
-}
-
-static struct transform* find_transform(const char *name) {
-    fprintf(stderr, "DEBUG: Buscando transformación '%s'\n", name);
-    for (size_t i = 0; i < manager.transform_count; i++) {
-        if (strcmp(manager.transforms[i].name, name) == 0) {
-            return &manager.transforms[i];
-        }
-    }
-    return NULL;
 }
 
 bool transform_test(const char *name, const char *input, char *output, size_t output_size) {
