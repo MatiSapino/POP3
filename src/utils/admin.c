@@ -15,45 +15,80 @@ static const struct fd_handler admin_handler = {
     .handle_read = admin_read,
     .handle_write = admin_write,
     .handle_close = admin_close,
-    .handle_block = NULL
+    .handle_block = NULL,
 };
 
 static void handle_get_metrics(struct admin_client *client);
 static void handle_admin_command(struct admin_client *client, char *command);
 static void handle_transform_add(struct admin_client *client, const char *name, const char *command);
 static void handle_transform_list(struct admin_client *client);
+static void admin_accept(struct selector_key *key);
 
-void admin_read(struct selector_key *key) {
-    fprintf(stderr, "Recibiendo comando administrativo\n");
-    struct admin_client *client = (struct admin_client *)key->data;
-    size_t limit;
-    uint8_t *ptr = buffer_write_ptr(&client->read_buffer, &limit);
-    ssize_t count = read(key->fd, ptr, limit);
+static void admin_read(struct selector_key *key) {
+    printf("DEBUG: Iniciando admin_read\n");
 
-    if (count <= 0) {
-        selector_unregister_fd(key->s, key->fd);
-        return;
-    }
-
-    buffer_write_adv(&client->read_buffer, count);
-
-    // Procesar comando
-    char command[ADMIN_BUFFER_SIZE];
-    size_t command_len = 0;
-    uint8_t *read_ptr = buffer_read_ptr(&client->read_buffer, &limit);
-    
-    while (limit > 0 && command_len < sizeof(command) - 1) {
-        if (*read_ptr == '\n' || *read_ptr == '\r') {
-            command[command_len] = '\0';
-            handle_admin_command(client, command);
-            buffer_read_adv(&client->read_buffer, command_len + 1);
-            break;
+    // Si es el socket principal (listening socket)
+    if (key->data == NULL) {
+        // Este es el socket de escucha, aceptar nueva conexión
+        struct sockaddr_in client_addr;
+        socklen_t client_addr_len = sizeof(client_addr);
+        
+        const int client_fd = accept(key->fd, (struct sockaddr*)&client_addr, &client_addr_len);
+        if (client_fd < 0) {
+            fprintf(stderr, "DEBUG: Error en accept. client_fd = %d\n", client_fd);
+            return;
         }
-        command[command_len++] = *read_ptr++;
-        limit--;
+        
+        printf("DEBUG: Nueva conexión administrativa aceptada. FD: %d\n", client_fd);
+        
+        // Crear y configurar el cliente
+        struct admin_client *client = malloc(sizeof(*client));
+        if (client == NULL) {
+            close(client_fd);
+            return;
+        }
+        
+        // Inicializar cliente y buffers
+        memset(client, 0, sizeof(*client));
+        client->fd = client_fd;
+        client->closed = false;
+        buffer_init(&client->read_buffer, ADMIN_BUFFER_SIZE, client->read_buffer_data);
+        buffer_init(&client->write_buffer, ADMIN_BUFFER_SIZE, client->write_buffer_data);
+        
+        // Hacer el socket no bloqueante
+        int flags = fcntl(client_fd, F_GETFL, 0);
+        fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+        
+        // Registrar para lectura
+        selector_status status = selector_register(key->s, client_fd, &admin_handler, OP_READ, client);
+        if (status != SELECTOR_SUCCESS) {
+            printf("DEBUG: Error registrando cliente: %d\n", status);
+            free(client);
+            close(client_fd);
+            return;
+        }
+        
+        printf("DEBUG: Cliente registrado exitosamente\n");
+    } else {
+        // Es un socket de cliente, manejar la lectura de datos
+        struct admin_client *client = (struct admin_client *)key->data;
+        
+        size_t space = buffer_available_space(&client->read_buffer);
+        uint8_t *ptr = buffer_write_ptr(&client->read_buffer, &space);
+        
+        ssize_t n = read(key->fd, ptr, space);
+        if (n <= 0) {
+            // Error o conexión cerrada
+            selector_unregister_fd(key->s, key->fd);
+            admin_close(key);
+            return;
+        }
+        
+        buffer_write_adv(&client->read_buffer, n);
+        printf("DEBUG: Datos leídos del cliente: %.*s\n", (int)n, ptr);
+        
+        // Aquí procesarías el comando recibido
     }
-
-    selector_set_interest(key->s, key->fd, OP_WRITE);
 }
 
 void admin_write(struct selector_key *key) {
@@ -168,6 +203,49 @@ static void handle_transform_list(struct admin_client *client) {
     write_string_to_buffer(&client->write_buffer, buffer);
 }
 
+static void admin_accept(struct selector_key *key) {
+    fprintf(stderr, "DEBUG: Iniciando admin_accept\n");
+    
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+    
+    const int client_fd = accept(key->fd, (struct sockaddr*)&client_addr, &client_addr_len);
+    if (client_fd < 0) {
+        fprintf(stderr, "DEBUG: Error en accept. client_fd = %d\n", client_fd);
+        return;
+    }
+    
+    // Crear y configurar el cliente
+    struct admin_client *client = malloc(sizeof(*client));
+    if (client == NULL) {
+        close(client_fd);
+        return;
+    }
+    
+    // Inicializar el cliente y sus buffers
+    memset(client, 0, sizeof(*client));
+    client->fd = client_fd;
+    client->closed = false;
+    
+    // Inicializar los buffers
+    buffer_init(&client->read_buffer, ADMIN_BUFFER_SIZE, client->read_buffer_data);
+    buffer_init(&client->write_buffer, ADMIN_BUFFER_SIZE, client->write_buffer_data);
+    
+    // Hacer el socket no bloqueante
+    int flags = fcntl(client_fd, F_GETFL, 0);
+    fcntl(client_fd, F_SETFL, flags | O_NONBLOCK);
+    
+    // Registrar para lectura
+    selector_status status = selector_register(key->s, client_fd, &admin_handler, OP_READ, client);
+    if (status != SELECTOR_SUCCESS) {
+        free(client);
+        close(client_fd);
+        return;
+    }
+    
+    fprintf(stderr, "DEBUG: Cliente administrativo conectado\n");
+}
+
 void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector selector) {
     struct sockaddr_in addr;
     
@@ -201,6 +279,7 @@ void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector s
     int flags = fcntl(admin_socket, F_GETFL, 0);
     fcntl(admin_socket, F_SETFL, flags | O_NONBLOCK);
 
+    // Registrar el socket principal para lectura
     selector_status status = selector_register(selector, admin_socket, &admin_handler, OP_READ, NULL);
     if (status != SELECTOR_SUCCESS) {
         fprintf(stderr, "Failed to register admin socket. Error: %d\n", status);
