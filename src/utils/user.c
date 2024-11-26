@@ -45,7 +45,7 @@ bool set_maildir() {
 }
 //si existe el usuario
 bool check_user(const char *username, struct Client* client) {
-    for(int i=0; i<userCount; i++){
+    for(int i=0; i<=userCount; i++){
         if(strcmp(users[i].username, username) == 0){
             okResponse(client, "user accepted");
             return true;
@@ -57,7 +57,7 @@ bool check_user(const char *username, struct Client* client) {
 
 //chequeo de la contraseña
 bool check_password(const char *username, const char *pass, struct Client* client) {
-    for(int i=0; i<userCount; i++){
+    for(int i=0; i<=userCount; i++){
         if(strcmp(users[i].username, username) == 0){
             if(strcmp(users[i].password,pass)==0){
                 return true;
@@ -135,9 +135,9 @@ bool add_user(char* username, char* pass){
         }
     }
 
+    userCount++;
     strncpy(users[userCount].username, username,MAX_USERNAME);
     strncpy(users[userCount].password, pass,MAX_PASSWORD);
-    userCount++;
     return true;
 }
 
