@@ -2,6 +2,7 @@
 #include "../include/metrics.h"
 #include <stdio.h>
 #include <time.h>
+#include <errno.h>
 
 static struct metrics metrics;
 
@@ -35,15 +36,18 @@ void log_command(const char *username, const char *command, const char *response
     tm_info = localtime(&now);
     strftime(timestamp, 26, "%Y-%m-%d %H:%M:%S", tm_info);
     
-    FILE *log = fopen("pop3_access.log", "a");
-    if (log != NULL) {
-        fprintf(log, "[%s] User: %-15s | Command: %-10s | Response: %s\n", 
-                timestamp, 
-                username ? username : "anonymous", 
-                command ? command : "unknown", 
-                response ? response : "no response");
-        fclose(log);
+    FILE *log = fopen(LOG_FILE, "a+");
+    if (log == NULL) {
+        fprintf(stderr, "ERROR: No se pudo abrir pop3_access.log: %s\n", strerror(errno));
+        return;
     }
+    
+    fprintf(log, "[%s] User: %-15s | Command: %-10s | Response: %s\n", 
+            timestamp, 
+            username ? username : "anonymous", 
+            command ? command : "unknown", 
+            response ? response : "no response");
+    fclose(log);
 }
 
 void metrics_set_active_users(int i){

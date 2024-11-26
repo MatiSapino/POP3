@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <time.h>
 
+#define LOG_FILE "/var/log/pop3_access.log"
+
 struct metrics {
   size_t currentConnections;
   size_t totalConnections;

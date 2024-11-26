@@ -8,6 +8,9 @@
 #include "../include/metrics.h"
 #include "../include/buffer.h"
 #include "../include/transform.h"
+#include <errno.h>
+
+#define LOG_FILE "/var/log/pop3_access.log"
 
 static int admin_socket = -1;
 
@@ -35,8 +38,6 @@ static struct server_config current_config = {
 };
 
 void admin_read(struct selector_key *key) {
-    fprintf(stderr, "DEBUG: Iniciando admin_read\n");
-
     // Si es el socket principal (listening socket)
     if (key->data == NULL) {
         // Este es el socket de escucha, aceptar nueva conexión
@@ -45,11 +46,8 @@ void admin_read(struct selector_key *key) {
         
         const int client_fd = accept(key->fd, (struct sockaddr*)&client_addr, &client_addr_len);
         if (client_fd < 0) {
-            fprintf(stderr, "DEBUG: Error en accept. client_fd = %d\n", client_fd);
             return;
         }
-        
-        fprintf(stderr, "DEBUG: Nueva conexión administrativa aceptada. FD: %d\n", client_fd);
         
         // Crear y configurar el cliente
         struct admin_client *client = malloc(sizeof(*client));
@@ -72,34 +70,26 @@ void admin_read(struct selector_key *key) {
         // Registrar para lectura
         selector_status status = selector_register(key->s, client_fd, &admin_handler, OP_READ, client);
         if (status != SELECTOR_SUCCESS) {
-            fprintf(stderr, "DEBUG: Error registrando cliente: %d\n", status);
             free(client);
             close(client_fd);
             return;
         }
-        
-        fprintf(stderr, "DEBUG: Cliente registrado exitosamente\n");
     } else {
         // Es un socket de cliente, manejar la lectura de datos
         struct admin_client *client = (struct admin_client *)key->data;
-        fprintf(stderr, "DEBUG: Procesando datos del cliente\n");
         
         size_t space;
         uint8_t *ptr = buffer_write_ptr(&client->read_buffer, &space);
-        fprintf(stderr, "DEBUG: Espacio disponible en buffer: %zu\n", space);
         
         if (!buffer_can_write(&client->read_buffer)) {
-            fprintf(stderr, "DEBUG: Buffer lleno\n");
             selector_unregister_fd(key->s, key->fd);
             admin_close(key);
             return;
         }
         
         ssize_t n = read(key->fd, ptr, space);
-        fprintf(stderr, "DEBUG: Bytes leídos: %zd\n", n);
         
         if (n <= 0) {
-            fprintf(stderr, "DEBUG: Error o conexión cerrada. n = %zd\n", n);
             selector_unregister_fd(key->s, key->fd);
             admin_close(key);
             return;
@@ -109,24 +99,17 @@ void admin_read(struct selector_key *key) {
         
         size_t count;
         uint8_t *read_ptr = buffer_read_ptr(&client->read_buffer, &count);
-        fprintf(stderr, "DEBUG: Datos en buffer: '%.*s'\n", (int)count, read_ptr);
         
         if(count > 0) {
-            fprintf(stderr, "DEBUG: Buscando fin de línea en %zu bytes\n", count);
             for(size_t i = 0; i < count; i++) {
                 if(read_ptr[i] == '\n') {
-                    fprintf(stderr, "DEBUG: Encontrado fin de línea en posición %zu\n", i);
                     read_ptr[i] = '\0';
-                    fprintf(stderr, "DEBUG: Comando a procesar: '%s'\n", read_ptr);
                     handle_admin_command(client, (char *)read_ptr);
                     buffer_read_adv(&client->read_buffer, i + 1);
                     
                     selector_status st = selector_set_interest(key->s, key->fd, OP_WRITE);
-                    fprintf(stderr, "DEBUG: Cambiando a modo escritura: %s\n", 
-                           st == SELECTOR_SUCCESS ? "exitoso" : "fallido");
                     
                     if(st != SELECTOR_SUCCESS) {
-                        fprintf(stderr, "DEBUG: Error al cambiar a modo escritura\n");
                         selector_unregister_fd(key->s, key->fd);
                         admin_close(key);
                     }
@@ -138,15 +121,12 @@ void admin_read(struct selector_key *key) {
 }
 
 void admin_write(struct selector_key *key) {
-    fprintf(stderr, "DEBUG: Iniciando admin_write\n");
     struct admin_client *client = (struct admin_client *)key->data;
     
     size_t limit;
     uint8_t *ptr = buffer_read_ptr(&client->write_buffer, &limit);
-    fprintf(stderr, "DEBUG: Datos a enviar: '%.*s'\n", (int)limit, ptr);
 
     ssize_t count = write(key->fd, ptr, limit);
-    fprintf(stderr, "DEBUG: Bytes enviados: %zd\n", count);
     
     buffer_read_adv(&client->write_buffer, count);
 
@@ -420,11 +400,18 @@ static void handle_user_history(struct admin_client *client, const char *usernam
         return;
     }
 
-    FILE *log = fopen("pop3_access.log", "r");
+    FILE *log = fopen(LOG_FILE, "r");
     if (log == NULL) {
-        write_string_to_buffer(&client->write_buffer, "Error: Could not open log file\n");
+        char error_msg[256];
+        snprintf(error_msg, sizeof(error_msg), 
+                "Error: Could not open log file: %s\n", 
+                strerror(errno));
+        write_string_to_buffer(&client->write_buffer, error_msg);
+        fprintf(stderr, "DEBUG: %s", error_msg);
         return;
     }
+
+    fprintf(stderr, "DEBUG: Archivo log abierto correctamente\n");
 
     char line[1024];
     char response[ADMIN_BUFFER_SIZE] = "";
@@ -436,8 +423,10 @@ static void handle_user_history(struct admin_client *client, const char *usernam
             if (total_len + line_len < ADMIN_BUFFER_SIZE - 1) {
                 strcat(response, line);
                 total_len += line_len;
+                fprintf(stderr, "DEBUG: Línea encontrada para %s: %s", username, line);
             } else {
-                break; // Evitar desbordamiento del buffer
+                fprintf(stderr, "DEBUG: Buffer lleno, deteniendo lectura\n");
+                break;
             }
         }
     }
@@ -446,6 +435,7 @@ static void handle_user_history(struct admin_client *client, const char *usernam
 
     if (total_len == 0) {
         snprintf(response, sizeof(response), "No commands found for user: %s\n", username);
+        fprintf(stderr, "DEBUG: No se encontraron comandos para el usuario %s\n", username);
     }
 
     write_string_to_buffer(&client->write_buffer, response);
@@ -525,11 +515,7 @@ void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector s
     // Registrar el socket principal para lectura
     selector_status status = selector_register(selector, admin_socket, &admin_handler, OP_READ, NULL);
     if (status != SELECTOR_SUCCESS) {
-        fprintf(stderr, "Failed to register admin socket. Error: %d\n", status);
         close(admin_socket);
         return;
     }
-
-    fprintf(stderr, "Admin server listening on %s:%d\n", admin_addr, admin_port);
-    
 }
