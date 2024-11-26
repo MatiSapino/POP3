@@ -318,7 +318,7 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     char *transform_cmd = NULL;
     
     // Buscar el pipe
-    char *pipe = strchr(msg_num_str, '|');
+    char *pipe = strchr(command->args2, '|');
     if (pipe != NULL) {
         *pipe = '\0';  // Separar el número del comando
         transform_cmd = pipe + 1;
