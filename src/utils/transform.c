@@ -256,3 +256,12 @@ bool transform_test(const char *name, const char *input, char *output, size_t ou
 
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 } 
+
+bool transform_set_enabled(const char *name, bool enabled) {
+    struct transform *t = find_transform(name);
+    if (t == NULL) {
+        return false;
+    }
+    t->enabled = enabled;
+    return true;
+}
