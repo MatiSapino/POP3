@@ -203,10 +203,12 @@ void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector s
 
     selector_status status = selector_register(selector, admin_socket, &admin_handler, OP_READ, NULL);
     if (status != SELECTOR_SUCCESS) {
-        perror("Failed to register admin socket");
+        fprintf(stderr, "Failed to register admin socket. Error: %d\n", status);
         close(admin_socket);
         return;
     }
+
+    fprintf(stderr, "Admin server listening on %s:%d\n", admin_addr, admin_port);
 }
 
 void admin_accept(struct selector_key *key) {

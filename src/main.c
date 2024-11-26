@@ -68,8 +68,6 @@ int main(const int argc, char **argv) {
         goto finally;
     }
 
-    admin_init(pop3_args.mng_addr, pop3_args.mng_port, selector);
-
     signal(SIGTERM, sigterm_handler);
     signal(SIGINT,  sigterm_handler);
 
@@ -81,7 +79,9 @@ int main(const int argc, char **argv) {
     if (selector == NULL) {
         goto finally;
     }
-
+    
+    admin_init(pop3_args.mng_addr, pop3_args.mng_port, selector);
+    
     const fd_handler passiveHandler = {
         .handle_read = passiveAccept,
         .handle_write = NULL,
