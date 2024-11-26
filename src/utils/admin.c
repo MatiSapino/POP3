@@ -289,33 +289,3 @@ void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector s
 
     fprintf(stderr, "Admin server listening on %s:%d\n", admin_addr, admin_port);
 }
-
-void admin_accept(struct selector_key *key) {
-    struct sockaddr_in client_addr;
-    socklen_t client_len = sizeof(client_addr);
-    
-    int client_fd = accept(key->fd, (struct sockaddr *)&client_addr, &client_len);
-    if (client_fd < 0) {
-        return;
-    }
-    
-    struct admin_client *client = malloc(sizeof(*client));
-    if (client == NULL) {
-        close(client_fd);
-        return;
-    }
-    
-    memset(client, 0, sizeof(*client));
-    buffer_init(&client->read_buffer, sizeof(client->read_buffer_data), client->read_buffer_data);
-    buffer_init(&client->write_buffer, sizeof(client->write_buffer_data), client->write_buffer_data);
-    
-    selector_status status = selector_register(key->s, client_fd, &admin_handler, OP_READ, client);
-    if (status != SELECTOR_SUCCESS) {
-        free(client);
-        close(client_fd);
-    }
-
-    // Enviar mensaje de bienvenida
-    const char *welcome = "Bienvenido al servidor administrativo\n> ";
-    write(client_fd, welcome, strlen(welcome));
-} 

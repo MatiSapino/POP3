@@ -17,6 +17,7 @@ enum admin_state {
 };
 
 struct admin_client {
+    int fd;
     struct buffer read_buffer;
     struct buffer write_buffer;
     uint8_t read_buffer_data[ADMIN_BUFFER_SIZE];
