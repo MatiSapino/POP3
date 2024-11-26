@@ -149,7 +149,7 @@ void free_mailbox(struct mailbox *box){
     free(box);
 }
 
-void init_mailbox(const char *username, struct Client* client){
+void init_mailbox(struct Client* client){
     struct mailbox *box = malloc(sizeof(struct mailbox));
     if (box == NULL) {
         fprintf(stderr, "Error: No se pudo asignar memoria para mailbox\n");
@@ -159,7 +159,7 @@ void init_mailbox(const char *username, struct Client* client){
     memset(box, 0, sizeof(struct mailbox));
     
     char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/%s/new", maildir, username);
+    snprintf(path, sizeof(path), "%s/%s/new", maildir, client->user->username);
     fprintf(stderr, "Buscando emails en: %s\n", path);
     
     DIR *dir = opendir(path);

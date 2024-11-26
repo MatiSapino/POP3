@@ -114,7 +114,7 @@ static enum pop3_state executePASS(struct selector_key * key, struct command * c
     if(check_password(client->user->username, (char*)command->args1, client)){
         strcpy(client->user->password, (char*)command->args1);
         client->authenticated = true;
-        init_mailbox(client->user->username, client);
+        init_mailbox(client);
         okResponse(client, "maildrop locked and ready");
     }     
     return STATE_WRITE;   
@@ -208,7 +208,6 @@ static enum pop3_state executeSTAT(struct selector_key *key, struct command *com
     fprintf(stderr, "DEBUG: Enviando respuesta: %s\n", response);
     okResponse(client, response);
     
-    free(box);
     return STATE_WRITE;
 }
 
@@ -240,14 +239,12 @@ static enum pop3_state executeLIST(struct selector_key *key, struct command *com
         if (*endptr != '\0' || msg_num <= 0 || msg_num > box->mail_count) {
             fprintf(stderr, "DEBUG: Invalid message number: %s\n", (char *)command->args1);
             errResponse(client, "no such message");
-            free(box);
             return STATE_WRITE;
         }
 
         struct mail *mail = &box->mails[msg_num - 1];
         if (mail->deleted) {
             errResponse(client, "message is deleted");
-            free(box);
             return STATE_WRITE;
         }
 
@@ -288,7 +285,6 @@ static enum pop3_state executeLIST(struct selector_key *key, struct command *com
     log_command(client->user->username, "LIST", 
                 command->args1 ? (char *)command->args1 : "all messages");
 
-    free(box);
     return STATE_WRITE;
 }
 
@@ -329,7 +325,6 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     if (msg_num > box->mail_count) {
         fprintf(stderr, "No such message: %ld\n", msg_num);
         errResponse(client, "no such message");
-        free(box);
         return STATE_WRITE;
     }
     
@@ -341,7 +336,6 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     if (mail->deleted) {
         fprintf(stderr, "Message has been deleted: %ld\n", msg_num);
         errResponse(client, "message has been deleted");
-        free(box);
         return STATE_WRITE;
     }
     
@@ -352,7 +346,6 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     if (getenv("HOME") == NULL) {
         fprintf(stderr, "HOME environment variable not set\n");
         errResponse(client, "internal server error");
-        free(box);
         return STATE_WRITE;
     }
     
@@ -383,7 +376,6 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
         fprintf(stderr, "Could not open transformed message: %s\n", output_path);
         errResponse(client, "could not open message");
         unlink(output_path);
-        free(box);
         return STATE_WRITE;
     }
     
@@ -412,7 +404,6 @@ static enum pop3_state executeRETR(struct selector_key *key, struct command *com
     
     fclose(file);
     unlink(output_path);
-    free(box);
     
     return STATE_WRITE;
 }
@@ -457,7 +448,6 @@ static enum pop3_state executeDELE(struct selector_key *key, struct command *com
     if (msg_num > box->mail_count) {
         fprintf(stderr, "DEBUG: No such message: %ld\n", msg_num);
         errResponse(client, "no such message");
-        free(box);
         return STATE_WRITE;
     }
     
@@ -466,7 +456,6 @@ static enum pop3_state executeDELE(struct selector_key *key, struct command *com
     if (mail->deleted) {
         fprintf(stderr, "DEBUG: Message already deleted: %ld\n", msg_num);
         errResponse(client, "message already deleted");
-        free(box);
         return STATE_WRITE;
     }
     
@@ -481,8 +470,6 @@ static enum pop3_state executeDELE(struct selector_key *key, struct command *com
     
     // Enviar respuesta exitosa
     okResponse(client, response);
-    
-    free(box);
     return STATE_WRITE;
 }
 
@@ -547,7 +534,6 @@ static enum pop3_state executeRSET(struct selector_key *key, struct command *com
     // Enviar respuesta exitosa
     okResponse(client, "maildrop has been reset");
     
-    free(box);
     return STATE_WRITE;
 }
 
