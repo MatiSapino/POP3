@@ -24,7 +24,7 @@ struct admin_client {
     bool closed;
 };
 
-void admin_init(const char *admin_addr, unsigned short admin_port);
+void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector selector);
 void admin_accept(struct selector_key *key);
 void admin_close(struct selector_key *key);
 void admin_read(struct selector_key *key);

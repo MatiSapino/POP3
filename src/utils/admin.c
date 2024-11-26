@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include "../include/admin.h"
 #include "../include/metrics.h"
 #include "../include/buffer.h"
@@ -23,6 +24,7 @@ static void handle_transform_add(struct admin_client *client, const char *name, 
 static void handle_transform_list(struct admin_client *client);
 
 void admin_read(struct selector_key *key) {
+    fprintf(stderr, "Recibiendo comando administrativo\n");
     struct admin_client *client = (struct admin_client *)key->data;
     size_t limit;
     uint8_t *ptr = buffer_write_ptr(&client->read_buffer, &limit);
@@ -55,6 +57,7 @@ void admin_read(struct selector_key *key) {
 }
 
 void admin_write(struct selector_key *key) {
+    fprintf(stderr, "Enviando respuesta administrativa\n");
     struct admin_client *client = (struct admin_client *)key->data;
     size_t limit;
     uint8_t *ptr = buffer_read_ptr(&client->write_buffer, &limit);
@@ -165,7 +168,7 @@ static void handle_transform_list(struct admin_client *client) {
     write_string_to_buffer(&client->write_buffer, buffer);
 }
 
-void admin_init(const char *admin_addr, unsigned short admin_port) {
+void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector selector) {
     struct sockaddr_in addr;
     
     admin_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -173,6 +176,9 @@ void admin_init(const char *admin_addr, unsigned short admin_port) {
         perror("admin socket creation failed");
         return;
     }
+    
+    int opt = 1;
+    setsockopt(admin_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -187,6 +193,17 @@ void admin_init(const char *admin_addr, unsigned short admin_port) {
     
     if (listen(admin_socket, 1) < 0) {
         perror("admin socket listen failed");
+        close(admin_socket);
+        return;
+    }
+
+    // Hacer el socket no bloqueante
+    int flags = fcntl(admin_socket, F_GETFL, 0);
+    fcntl(admin_socket, F_SETFL, flags | O_NONBLOCK);
+
+    selector_status status = selector_register(selector, admin_socket, &admin_handler, OP_READ, NULL);
+    if (status != SELECTOR_SUCCESS) {
+        perror("Failed to register admin socket");
         close(admin_socket);
         return;
     }
@@ -216,4 +233,8 @@ void admin_accept(struct selector_key *key) {
         free(client);
         close(client_fd);
     }
+
+    // Enviar mensaje de bienvenida
+    const char *welcome = "Bienvenido al servidor administrativo\n> ";
+    write(client_fd, welcome, strlen(welcome));
 } 

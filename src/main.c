@@ -68,7 +68,7 @@ int main(const int argc, char **argv) {
         goto finally;
     }
 
-    admin_init(pop3_args.mng_addr, pop3_args.mng_port);
+    admin_init(pop3_args.mng_addr, pop3_args.mng_port, selector);
 
     signal(SIGTERM, sigterm_handler);
     signal(SIGINT,  sigterm_handler);
