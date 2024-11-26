@@ -23,7 +23,7 @@ static void handle_admin_command(struct admin_client *client, char *command);
 static void handle_transform_add(struct admin_client *client, const char *name, const char *command);
 static void handle_transform_list(struct admin_client *client);
 
-static void admin_read(struct selector_key *key) {
+void admin_read(struct selector_key *key) {
     printf("DEBUG: Iniciando admin_read\n");
 
     // Si es el socket principal (listening socket)
@@ -71,28 +71,58 @@ static void admin_read(struct selector_key *key) {
     } else {
         // Es un socket de cliente, manejar la lectura de datos
         struct admin_client *client = (struct admin_client *)key->data;
+        printf("DEBUG: Procesando datos del cliente\n");
         
         size_t space;
         uint8_t *ptr = buffer_write_ptr(&client->read_buffer, &space);
+        printf("DEBUG: Espacio disponible en buffer: %zu\n", space);
+        
         if (!buffer_can_write(&client->read_buffer)) {
-            // Buffer lleno
+            printf("DEBUG: Buffer lleno\n");
             selector_unregister_fd(key->s, key->fd);
             admin_close(key);
             return;
         }
         
         ssize_t n = read(key->fd, ptr, space);
+        printf("DEBUG: Bytes leídos: %zd\n", n);
+        
         if (n <= 0) {
-            // Error o conexión cerrada
+            fprintf(stderr, "DEBUG: Error o conexión cerrada. n = %zd\n", n);
             selector_unregister_fd(key->s, key->fd);
             admin_close(key);
             return;
         }
         
         buffer_write_adv(&client->read_buffer, n);
-        printf("DEBUG: Datos leídos del cliente: %.*s\n", (int)n, ptr);
         
-        // Aquí procesarías el comando recibido
+        size_t count;
+        uint8_t *read_ptr = buffer_read_ptr(&client->read_buffer, &count);
+        printf("DEBUG: Datos en buffer: '%.*s'\n", (int)count, read_ptr);
+        
+        if(count > 0) {
+            printf("DEBUG: Buscando fin de línea en %zu bytes\n", count);
+            for(size_t i = 0; i < count; i++) {
+                if(read_ptr[i] == '\n') {
+                    printf("DEBUG: Encontrado fin de línea en posición %zu\n", i);
+                    read_ptr[i] = '\0';
+                    printf("DEBUG: Comando a procesar: '%s'\n", read_ptr);
+                    handle_admin_command(client, (char *)read_ptr);
+                    buffer_read_adv(&client->read_buffer, i + 1);
+                    
+                    selector_status st = selector_set_interest(key->s, key->fd, OP_WRITE);
+                    printf("DEBUG: Cambiando a modo escritura: %s\n", 
+                           st == SELECTOR_SUCCESS ? "exitoso" : "fallido");
+                    
+                    if(st != SELECTOR_SUCCESS) {
+                        printf("DEBUG: Error al cambiar a modo escritura\n");
+                        selector_unregister_fd(key->s, key->fd);
+                        admin_close(key);
+                    }
+                    break;
+                }
+            }
+        }
     }
 }
 
@@ -250,4 +280,5 @@ void admin_init(const char *admin_addr, unsigned short admin_port, fd_selector s
     }
 
     fprintf(stderr, "Admin server listening on %s:%d\n", admin_addr, admin_port);
+    
 }
