@@ -28,6 +28,7 @@ void transform_init(void) {
 }
 
 bool transform_add(const char *name, const char *command) {
+    fprintf(stderr, "DEBUG: Agregando transformación '%s' con comando '%s'\n", name, command);
     if (manager.transform_count >= MAX_TRANSFORMS) {
         return false;
     }
@@ -165,6 +166,7 @@ void transform_list(char *buffer, size_t buffer_size) {
 }
 
 static struct transform* find_transform(const char *name) {
+    fprintf(stderr, "DEBUG: Buscando transformación '%s'\n", name);
     for (size_t i = 0; i < manager.transform_count; i++) {
         if (strcmp(manager.transforms[i].name, name) == 0) {
             return &manager.transforms[i];
@@ -174,21 +176,27 @@ static struct transform* find_transform(const char *name) {
 }
 
 bool transform_test(const char *name, const char *input, char *output, size_t output_size) {
+    fprintf(stderr, "DEBUG: transform_test - name: '%s', input: '%s'\n", name, input);
+    
     // Buscar la transformación por nombre
     struct transform *t = find_transform(name);
     if (t == NULL) {
+        fprintf(stderr, "DEBUG: Transformación '%s' no encontrada\n", name);
         return false;
     }
+    fprintf(stderr, "DEBUG: Encontrada transformación '%s' con comando '%s'\n", name, t->command);
 
     // Crear un pipe para la comunicación
     int pipefd[2];
     if (pipe(pipefd) == -1) {
+        fprintf(stderr, "DEBUG: Error creando pipe: %s\n", strerror(errno));
         return false;
     }
 
     // Fork para ejecutar el comando
     pid_t pid = fork();
     if (pid == -1) {
+        fprintf(stderr, "DEBUG: Error en fork: %s\n", strerror(errno));
         close(pipefd[0]);
         close(pipefd[1]);
         return false;
@@ -200,7 +208,9 @@ bool transform_test(const char *name, const char *input, char *output, size_t ou
         close(pipefd[1]);
 
         // Ejecutar el comando
+        fprintf(stderr, "DEBUG: Hijo ejecutando comando: sh -c '%s'\n", t->command);
         execlp("sh", "sh", "-c", t->command, NULL);
+        fprintf(stderr, "DEBUG: Error ejecutando comando: %s\n", strerror(errno));
         exit(1);
     }
 
@@ -208,12 +218,15 @@ bool transform_test(const char *name, const char *input, char *output, size_t ou
     close(pipefd[1]);  // Cerrar extremo de escritura
     
     // Escribir input al pipe
-    write(pipefd[0], input, strlen(input));
-    close(pipefd[0]);
+    ssize_t bytes_written = write(pipefd[0], input, strlen(input));
+    fprintf(stderr, "DEBUG: Escritos %zd bytes al pipe\n", bytes_written);
 
     // Leer resultado
     ssize_t bytes_read = read(pipefd[0], output, output_size - 1);
+    fprintf(stderr, "DEBUG: Leídos %zd bytes del pipe\n", bytes_read);
+    
     if (bytes_read < 0) {
+        fprintf(stderr, "DEBUG: Error leyendo del pipe: %s\n", strerror(errno));
         return false;
     }
     output[bytes_read] = '\0';
@@ -221,6 +234,8 @@ bool transform_test(const char *name, const char *input, char *output, size_t ou
     // Esperar que termine el hijo
     int status;
     waitpid(pid, &status, 0);
+    
+    fprintf(stderr, "DEBUG: Proceso hijo terminó con estado %d\n", WEXITSTATUS(status));
 
     return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 } 
