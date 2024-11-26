@@ -21,5 +21,8 @@ void metrics_connection_closed();
 void metrics_bytes_sent(size_t bytes);
 void metrics_get_metrics(struct metrics * metrics);
 void log_command(const char *username, const char *command, const char *response);
+void metrics_set_active_users(int i);
+void metrics_set_commands(int i);
+void metric_set_failed_commands(int i);
 
 #endif //METRICS_H

@@ -72,7 +72,13 @@ enum pop3_state executeCommand(struct selector_key * selector_key, struct comman
 
     for (i = 0; commandFunction[i].name != NULL; i++) {
         if (strcasecmp(commandFunction[i].name, (char *)command->data) == 0) {
-            return commandFunction[i].function(selector_key, command);
+            enum pop3_state state;
+            state = commandFunction[i].function(selector_key, command);
+            if(state==STATE_ERROR){
+                metric_set_failed_commands(1);
+            }
+            metrics_set_commands(1);
+            return state;
         }
     }
 
@@ -118,6 +124,7 @@ static enum pop3_state executePASS(struct selector_key * key, struct command * c
         client->authenticated = true;
         init_mailbox(client);
         okResponse(client, "maildrop locked and ready");
+        metrics_set_active_users(1);
     }     
     return STATE_WRITE;   
 }
@@ -148,6 +155,7 @@ static enum pop3_state executeQUIT(struct selector_key *key, struct command *com
             
             free_mailbox(box);
         }
+        metrics_set_active_users(-1);
     }
     
     client->closed = true;

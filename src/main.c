@@ -44,6 +44,8 @@ int main(const int argc, char **argv) {
 
     metrics_init();
 
+    transform_init();
+
     int ret = -1;
 
     const struct selector_init init = {

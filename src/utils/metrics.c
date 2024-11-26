@@ -44,3 +44,15 @@ void log_command(const char *username, const char *command, const char *response
         fclose(log);
     }
 }
+
+void metrics_set_active_users(int i){
+  metrics.activeUsers += i;
+}
+
+void metrics_set_commands(int i){
+  metrics.totalCommands += i;
+}
+
+void metric_set_failed_commands(int i){
+  metrics.failedCommands += i;
+}
