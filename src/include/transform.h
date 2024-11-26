@@ -34,4 +34,7 @@ bool transform_apply(const char *input_file, const char *output_file);
 // Lista las transformaciones disponibles
 void transform_list(char *buffer, size_t buffer_size);
 
+// Agregar esta declaración junto con las otras funciones de transform
+bool transform_test(const char *name, const char *input, char *output, size_t output_size);
+
 #endif 

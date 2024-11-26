@@ -162,4 +162,65 @@ void transform_list(char *buffer, size_t buffer_size) {
                          manager.transforms[i].command,
                          manager.transforms[i].enabled ? "enabled" : "disabled");
     }
+}
+
+static struct transform* find_transform(const char *name) {
+    for (size_t i = 0; i < manager.transform_count; i++) {
+        if (strcmp(manager.transforms[i].name, name) == 0) {
+            return &manager.transforms[i];
+        }
+    }
+    return NULL;
+}
+
+bool transform_test(const char *name, const char *input, char *output, size_t output_size) {
+    // Buscar la transformación por nombre
+    struct transform *t = find_transform(name);
+    if (t == NULL) {
+        return false;
+    }
+
+    // Crear un pipe para la comunicación
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        return false;
+    }
+
+    // Fork para ejecutar el comando
+    pid_t pid = fork();
+    if (pid == -1) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return false;
+    }
+
+    if (pid == 0) {  // Proceso hijo
+        close(pipefd[0]);  // Cerrar extremo de lectura
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+
+        // Ejecutar el comando
+        execlp("sh", "sh", "-c", t->command, NULL);
+        exit(1);
+    }
+
+    // Proceso padre
+    close(pipefd[1]);  // Cerrar extremo de escritura
+    
+    // Escribir input al pipe
+    write(pipefd[0], input, strlen(input));
+    close(pipefd[0]);
+
+    // Leer resultado
+    ssize_t bytes_read = read(pipefd[0], output, output_size - 1);
+    if (bytes_read < 0) {
+        return false;
+    }
+    output[bytes_read] = '\0';
+
+    // Esperar que termine el hijo
+    int status;
+    waitpid(pid, &status, 0);
+
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
 } 
