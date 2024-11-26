@@ -24,7 +24,7 @@ static void handle_transform_add(struct admin_client *client, const char *name, 
 static void handle_transform_list(struct admin_client *client);
 
 void admin_read(struct selector_key *key) {
-    printf("DEBUG: Iniciando admin_read\n");
+    fprintf(stderr, "DEBUG: Iniciando admin_read\n");
 
     // Si es el socket principal (listening socket)
     if (key->data == NULL) {
@@ -38,7 +38,7 @@ void admin_read(struct selector_key *key) {
             return;
         }
         
-        printf("DEBUG: Nueva conexión administrativa aceptada. FD: %d\n", client_fd);
+        fprintf(stderr, "DEBUG: Nueva conexión administrativa aceptada. FD: %d\n", client_fd);
         
         // Crear y configurar el cliente
         struct admin_client *client = malloc(sizeof(*client));
@@ -61,31 +61,31 @@ void admin_read(struct selector_key *key) {
         // Registrar para lectura
         selector_status status = selector_register(key->s, client_fd, &admin_handler, OP_READ, client);
         if (status != SELECTOR_SUCCESS) {
-            printf("DEBUG: Error registrando cliente: %d\n", status);
+            fprintf(stderr, "DEBUG: Error registrando cliente: %d\n", status);
             free(client);
             close(client_fd);
             return;
         }
         
-        printf("DEBUG: Cliente registrado exitosamente\n");
+        fprintf(stderr, "DEBUG: Cliente registrado exitosamente\n");
     } else {
         // Es un socket de cliente, manejar la lectura de datos
         struct admin_client *client = (struct admin_client *)key->data;
-        printf("DEBUG: Procesando datos del cliente\n");
+        fprintf(stderr, "DEBUG: Procesando datos del cliente\n");
         
         size_t space;
         uint8_t *ptr = buffer_write_ptr(&client->read_buffer, &space);
-        printf("DEBUG: Espacio disponible en buffer: %zu\n", space);
+        fprintf(stderr, "DEBUG: Espacio disponible en buffer: %zu\n", space);
         
         if (!buffer_can_write(&client->read_buffer)) {
-            printf("DEBUG: Buffer lleno\n");
+            fprintf(stderr, "DEBUG: Buffer lleno\n");
             selector_unregister_fd(key->s, key->fd);
             admin_close(key);
             return;
         }
         
         ssize_t n = read(key->fd, ptr, space);
-        printf("DEBUG: Bytes leídos: %zd\n", n);
+        fprintf(stderr, "DEBUG: Bytes leídos: %zd\n", n);
         
         if (n <= 0) {
             fprintf(stderr, "DEBUG: Error o conexión cerrada. n = %zd\n", n);
@@ -98,24 +98,24 @@ void admin_read(struct selector_key *key) {
         
         size_t count;
         uint8_t *read_ptr = buffer_read_ptr(&client->read_buffer, &count);
-        printf("DEBUG: Datos en buffer: '%.*s'\n", (int)count, read_ptr);
+        fprintf(stderr, "DEBUG: Datos en buffer: '%.*s'\n", (int)count, read_ptr);
         
         if(count > 0) {
-            printf("DEBUG: Buscando fin de línea en %zu bytes\n", count);
+            fprintf(stderr, "DEBUG: Buscando fin de línea en %zu bytes\n", count);
             for(size_t i = 0; i < count; i++) {
                 if(read_ptr[i] == '\n') {
-                    printf("DEBUG: Encontrado fin de línea en posición %zu\n", i);
+                    fprintf(stderr, "DEBUG: Encontrado fin de línea en posición %zu\n", i);
                     read_ptr[i] = '\0';
-                    printf("DEBUG: Comando a procesar: '%s'\n", read_ptr);
+                    fprintf(stderr, "DEBUG: Comando a procesar: '%s'\n", read_ptr);
                     handle_admin_command(client, (char *)read_ptr);
                     buffer_read_adv(&client->read_buffer, i + 1);
                     
                     selector_status st = selector_set_interest(key->s, key->fd, OP_WRITE);
-                    printf("DEBUG: Cambiando a modo escritura: %s\n", 
+                    fprintf(stderr, "DEBUG: Cambiando a modo escritura: %s\n", 
                            st == SELECTOR_SUCCESS ? "exitoso" : "fallido");
                     
                     if(st != SELECTOR_SUCCESS) {
-                        printf("DEBUG: Error al cambiar a modo escritura\n");
+                        fprintf(stderr, "DEBUG: Error al cambiar a modo escritura\n");
                         selector_unregister_fd(key->s, key->fd);
                         admin_close(key);
                     }
@@ -127,17 +127,16 @@ void admin_read(struct selector_key *key) {
 }
 
 void admin_write(struct selector_key *key) {
-    fprintf(stderr, "Enviando respuesta administrativa\n");
+    fprintf(stderr, "DEBUG: Iniciando admin_write\n");
     struct admin_client *client = (struct admin_client *)key->data;
+    
     size_t limit;
     uint8_t *ptr = buffer_read_ptr(&client->write_buffer, &limit);
+    fprintf(stderr, "DEBUG: Datos a enviar: '%.*s'\n", (int)limit, ptr);
 
     ssize_t count = write(key->fd, ptr, limit);
-    if (count < 0) {
-        selector_unregister_fd(key->s, key->fd);
-        return;
-    }
-
+    fprintf(stderr, "DEBUG: Bytes enviados: %zd\n", count);
+    
     buffer_read_adv(&client->write_buffer, count);
 
     if (!buffer_can_read(&client->write_buffer)) {
@@ -167,13 +166,19 @@ static void write_string_to_buffer(struct buffer *buffer, const char *str) {
 }
 
 static void handle_admin_command(struct admin_client *client, char *command) {
+    fprintf(stderr, "DEBUG: Iniciando handle_admin_command con comando: '%s'\n", command);
+    
     char *cmd = strtok(command, " ");
     if (cmd == NULL) {
+        fprintf(stderr, "DEBUG: Comando inválido (NULL)\n");
         write_string_to_buffer(&client->write_buffer, "Invalid command\n");
         return;
     }
 
+    fprintf(stderr, "DEBUG: Comando parseado: '%s'\n", cmd);
+
     if (strcmp(cmd, "metrics") == 0) {
+        fprintf(stderr, "DEBUG: Ejecutando comando metrics\n");
         handle_get_metrics(client);
     } else if (strcmp(cmd, "transform") == 0) {
         char *subcmd = strtok(NULL, " ");
